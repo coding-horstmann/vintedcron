@@ -19,12 +19,30 @@ export const scanDeals = async (useAI: boolean = false): Promise<ArbitrageDeal[]
   try {
     console.log("Client: Attempting to fetch from /api/scan...");
     
+    // URLs aus localStorage laden, falls vorhanden
+    let customUrls: any[] | null = null;
+    if (typeof window !== 'undefined') {
+      const storedUrls = localStorage.getItem('vinted-urls');
+      if (storedUrls) {
+        try {
+          customUrls = JSON.parse(storedUrls);
+        } catch (e) {
+          console.warn('Fehler beim Laden der URLs aus localStorage');
+        }
+      }
+    }
+    
     // We set a short timeout because if the API route doesn't exist (client-only preview),
     // we don't want to wait forever.
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout für echte Scans
 
-    const response = await fetch('/api/scan', { 
+    // URLs als Query-Parameter senden, falls vorhanden
+    const url = customUrls && customUrls.length > 0
+      ? `/api/scan?urls=${encodeURIComponent(JSON.stringify(customUrls))}`
+      : '/api/scan';
+
+    const response = await fetch(url, { 
       signal: controller.signal,
       headers: { 'Accept': 'application/json' }
     });

@@ -6,7 +6,7 @@ import vintedUrls from '@/config/vinted-urls.json';
 
 // This function runs on the SERVER (Node.js environment)
 // It bypasses CORS restrictions that exist in the browser.
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const deals: ArbitrageDeal[] = [];
     
@@ -25,8 +25,20 @@ export async function GET() {
       console.warn('eBay API nicht konfiguriert. Setze EBAY_APP_ID in Umgebungsvariablen.');
     }
 
+    // URLs aus Request-Query oder Standard-URLs verwenden
+    let urlsToUse = vintedUrls.urls;
+    const urlParam = new URL(request.url).searchParams.get('urls');
+    if (urlParam) {
+      try {
+        const customUrls = JSON.parse(decodeURIComponent(urlParam));
+        urlsToUse = customUrls;
+      } catch (e) {
+        console.warn('Fehler beim Parsen der URLs, verwende Standard-URLs');
+      }
+    }
+
     // Alle aktivierten Vinted URLs durchgehen
-    const enabledUrls = vintedUrls.urls.filter((u: any) => u.enabled);
+    const enabledUrls = urlsToUse.filter((u: any) => u.enabled);
     
     if (enabledUrls.length === 0) {
       return NextResponse.json({ 
