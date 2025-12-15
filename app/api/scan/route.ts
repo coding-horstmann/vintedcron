@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { scrapeVintedCatalogUrl } from '../../../lib/scrapers';
-import { searchEbayByTitle, getEbaySearchUrl } from '../../../lib/ebay-api';
-import { ArbitrageDeal } from '../../../types';
-import vintedUrls from '../../../config/vinted-urls.json';
+import { scrapeVintedCatalogUrl } from '@/lib/scrapers';
+import { searchEbayByTitle, getEbaySearchUrl } from '@/lib/ebay-api';
+import { ArbitrageDeal } from '@/types';
+import vintedUrls from '@/config/vinted-urls.json';
 
 // This function runs on the SERVER (Node.js environment)
 // It bypasses CORS restrictions that exist in the browser.
