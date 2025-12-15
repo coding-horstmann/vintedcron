@@ -83,65 +83,43 @@ export async function GET(request: Request) {
               };
             }
             
-            // Wenn eBay API konfiguriert ist, nur profitable Deals hinzufügen
-            if (ebayConfig.appId && ebayResult.price > 0) {
-              // Arbitrage-Berechnung nur wenn eBay Preis verfügbar
-              if (ebayResult.price > vItem.price * 1.2) {
-                const fees = ebayResult.price * 0.11; // eBay Gebühren ~11%
-                const shipping = 4.50; // Geschätzter Versand
-                const profitAfterFees = ebayResult.price - vItem.price - fees - shipping;
-                
-                // Mindestprofit: 5€
-                if (profitAfterFees > 5) {
-                  deals.push({
-                    id: `deal-${Date.now()}-${deals.length}`,
-                    vinted: {
-                      id: `v-${deals.length}`,
-                      title: vItem.title,
-                      price: vItem.price,
-                      url: vItem.url,
-                      condition: vItem.condition,
-                      imageUrl: vItem.imageUrl || 'https://placehold.co/400?text=No+Image',
-                      category: urlConfig.category || 'Unbekannt'
-                    },
-                    ebay: {
-                      price: ebayResult.price,
-                      url: ebayResult.url,
-                      title: ebayResult.title
-                    },
-                    profit: ebayResult.price - vItem.price,
-                    profitAfterFees,
-                    roi: (profitAfterFees / vItem.price) * 100,
-                    timestamp: new Date(),
-                    status: 'new'
-                  });
-                }
-              }
-            } else {
-              // Wenn keine eBay API: Vinted-Items trotzdem zurückgeben (für Test/Demo)
-              deals.push({
-                id: `deal-${Date.now()}-${deals.length}`,
-                vinted: {
-                  id: `v-${deals.length}`,
-                  title: vItem.title,
-                  price: vItem.price,
-                  url: vItem.url,
-                  condition: vItem.condition,
-                  imageUrl: vItem.imageUrl || 'https://placehold.co/400?text=No+Image',
-                  category: urlConfig.category || 'Unbekannt'
-                },
-                ebay: {
-                  price: 0,
-                  url: ebayResult.url,
-                  title: 'eBay Preis nicht verfügbar (API nicht konfiguriert)'
-                },
-                profit: 0,
-                profitAfterFees: 0,
-                roi: 0,
-                timestamp: new Date(),
-                status: 'new'
-              });
+            // IMMER alle Items hinzufügen, nicht nur profitable Deals
+            let profit = 0;
+            let profitAfterFees = 0;
+            let roi = 0;
+            
+            // Berechne Profit nur wenn eBay Preis verfügbar
+            if (ebayConfig.appId && ebayResult.price > 0 && vItem.price > 0) {
+              profit = ebayResult.price - vItem.price;
+              const fees = ebayResult.price * 0.11; // eBay Gebühren ~11%
+              const shipping = 4.50; // Geschätzter Versand
+              profitAfterFees = ebayResult.price - vItem.price - fees - shipping;
+              roi = vItem.price > 0 ? (profitAfterFees / vItem.price) * 100 : 0;
             }
+            
+            // Alle Items hinzufügen, unabhängig von Profit
+            deals.push({
+              id: `deal-${Date.now()}-${deals.length}`,
+              vinted: {
+                id: `v-${deals.length}`,
+                title: vItem.title,
+                price: vItem.price,
+                url: vItem.url,
+                condition: vItem.condition,
+                imageUrl: vItem.imageUrl || 'https://placehold.co/400?text=No+Image',
+                category: urlConfig.category || 'Unbekannt'
+              },
+              ebay: {
+                price: ebayResult.price || 0,
+                url: ebayResult.url,
+                title: ebayResult.price > 0 ? ebayResult.title : 'eBay Preis nicht verfügbar (API nicht konfiguriert)'
+              },
+              profit,
+              profitAfterFees,
+              roi,
+              timestamp: new Date(),
+              status: 'new'
+            });
             
             // Rate Limiting zwischen eBay API Calls
             if (ebayConfig.appId) {

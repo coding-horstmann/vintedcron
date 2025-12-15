@@ -57,79 +57,124 @@ export const scrapeVintedCatalogUrl = async (catalogUrl: string) => {
     const $ = cheerio.load(data);
     const items: any[] = [];
 
-    // Vinted Selektoren - mehrere Varianten für Robustheit
-    // Vinted nutzt verschiedene Selektoren je nach Seite
+    // Debug: HTML-Struktur prüfen
+    console.log('HTML Content Length:', data.length);
+    console.log('Checking for Vinted structure...');
+
+    // Vinted Selektoren - erweiterte Varianten für verschiedene Seitenlayouts
     const selectors = [
       '.feed-grid__item',
       '[data-testid="item-box"]',
       '.item-box',
       '.new-item-box',
-      'article[data-testid="item-box"]'
+      'article[data-testid="item-box"]',
+      '[class*="ItemBox"]',
+      '[class*="item-box"]',
+      'div[class*="feed"] > div',
+      'div[class*="grid"] > div',
+      'a[href*="/items/"]'
     ];
 
     let foundItems = false;
     for (const selector of selectors) {
       const elements = $(selector);
+      console.log(`Selector "${selector}": ${elements.length} elements found`);
+      
       if (elements.length > 0) {
         foundItems = true;
         elements.each((_, element) => {
           const $el = $(element);
           
-          // Titel extrahieren
-          const title = $el.find('[data-testid="item-box-title"], .item-box__title, h3').first().text().trim();
+          // Titel extrahieren - mehrere Varianten
+          const title = $el.find('[data-testid="item-box-title"], .item-box__title, h2, h3, h4, [class*="title"]').first().text().trim() ||
+                       $el.attr('title') ||
+                       $el.text().trim();
           
-          // Preis extrahieren
-          const priceText = $el.find('[data-testid="item-box-price"], .item-box__price, .price').first().text().trim();
+          // Preis extrahieren - mehrere Varianten
+          const priceText = $el.find('[data-testid="item-box-price"], .item-box__price, .price, [class*="price"], [class*="Price"]').first().text().trim() ||
+                           $el.find('span:contains("€")').first().text().trim();
           const priceMatch = priceText.match(/[\d,]+/);
           const price = priceMatch ? parseFloat(priceMatch[0].replace(',', '.')) : null;
           
           // URL extrahieren
-          const relativeUrl = $el.find('a').first().attr('href');
+          const relativeUrl = $el.find('a').first().attr('href') || 
+                            $el.attr('href') ||
+                            $el.closest('a').attr('href');
           const url = relativeUrl 
             ? (relativeUrl.startsWith('http') ? relativeUrl : `https://www.vinted.de${relativeUrl}`)
             : null;
           
-          // Bild extrahieren
+          // Bild extrahieren - mehrere Varianten
           const img = $el.find('img').first().attr('src') || 
                       $el.find('img').first().attr('data-src') ||
                       $el.find('img').first().attr('data-lazy-src') ||
+                      $el.find('img').first().attr('data-original') ||
+                      $el.find('[style*="background-image"]').attr('style')?.match(/url\(['"]?(.*?)['"]?\)/)?.[1] ||
                       '';
           
           // Zustand extrahieren
-          const conditionText = $el.find('[data-testid="item-box-condition"], .item-box__condition, .condition').first().text().trim();
+          const conditionText = $el.find('[data-testid="item-box-condition"], .item-box__condition, .condition, [class*="condition"]').first().text().trim();
           const condition = conditionText ? mapVintedCondition(conditionText) : 'Sehr gut';
 
-          if (title && price !== null && url && !isNaN(price)) {
+          // Validierung: Mindestens Titel und URL müssen vorhanden sein
+          if (title && title.length > 3 && url && url.includes('/items/')) {
+            // Preis kann auch 0 sein oder fehlen
+            const finalPrice = (price !== null && !isNaN(price) && price > 0) ? price : 0;
+            
             items.push({
-              title,
-              price,
+              title: title.substring(0, 200), // Titel begrenzen
+              price: finalPrice,
               url,
-              imageUrl: img,
+              imageUrl: img || 'https://placehold.co/400?text=No+Image',
               condition,
               platform: 'vinted'
             });
           }
         });
-        break; // Ersten funktionierenden Selektor verwenden
+        
+        // Wenn Items gefunden wurden, nicht weiter suchen
+        if (items.length > 0) {
+          break;
+        }
       }
     }
 
-    if (!foundItems) {
-      console.warn('No items found with standard selectors, trying fallback...');
+    // Fallback: Suche nach JSON-Daten im HTML (Vinted nutzt manchmal JSON)
+    if (!foundItems || items.length === 0) {
+      console.warn('No items found with standard selectors, trying JSON fallback...');
+      
+      // Versuche JSON-Daten aus Script-Tags zu extrahieren
+      $('script[type="application/json"]').each((_, element) => {
+        try {
+          const jsonText = $(element).html();
+          if (jsonText && jsonText.includes('items')) {
+            const jsonData = JSON.parse(jsonText);
+            // Versuche Items aus verschiedenen JSON-Strukturen zu extrahieren
+            const extractedItems = extractItemsFromJSON(jsonData);
+            if (extractedItems.length > 0) {
+              items.push(...extractedItems);
+            }
+          }
+        } catch (e) {
+          // Ignore JSON parse errors
+        }
+      });
+      
       // Fallback: Suche nach allen Links die zu /items/ führen
-      $('a[href*="/items/"]').each((_, element) => {
-        const $el = $(element);
-        const title = $el.text().trim();
-        const url = $el.attr('href');
-        if (title && url && title.length > 5) {
-          // Versuche Preis aus dem umgebenden Element zu finden
-          const priceText = $el.closest('div, article').find('.price, [class*="price"]').first().text().trim();
-          const priceMatch = priceText.match(/[\d,]+/);
-          const price = priceMatch ? parseFloat(priceMatch[0].replace(',', '.')) : null;
+      if (items.length === 0) {
+        $('a[href*="/items/"]').each((_, element) => {
+          const $el = $(element);
+          const title = $el.text().trim() || $el.attr('title') || '';
+          const url = $el.attr('href');
           
-          if (price !== null && !isNaN(price)) {
+          if (title && title.length > 5 && url) {
+            // Versuche Preis aus dem umgebenden Element zu finden
+            const priceText = $el.closest('div, article, section').find('.price, [class*="price"], span:contains("€")').first().text().trim();
+            const priceMatch = priceText.match(/[\d,]+/);
+            const price = priceMatch ? parseFloat(priceMatch[0].replace(',', '.')) : 0;
+            
             items.push({
-              title,
+              title: title.substring(0, 200),
               price,
               url: url.startsWith('http') ? url : `https://www.vinted.de${url}`,
               imageUrl: '',
@@ -137,8 +182,34 @@ export const scrapeVintedCatalogUrl = async (catalogUrl: string) => {
               platform: 'vinted'
             });
           }
-        }
-      });
+        });
+      }
+    }
+
+    // Helper-Funktion für JSON-Extraktion
+    function extractItemsFromJSON(data: any): any[] {
+      const results: any[] = [];
+      
+      if (Array.isArray(data)) {
+        data.forEach(item => {
+          if (item.title || item.name) {
+            results.push({
+              title: item.title || item.name || '',
+              price: item.price || item.price_value || 0,
+              url: item.url || item.web_url || '',
+              imageUrl: item.image_url || item.photo?.url || '',
+              condition: item.condition || 'Sehr gut',
+              platform: 'vinted'
+            });
+          }
+        });
+      } else if (data.items) {
+        return extractItemsFromJSON(data.items);
+      } else if (data.catalog) {
+        return extractItemsFromJSON(data.catalog.items || data.catalog);
+      }
+      
+      return results;
     }
 
     console.log(`Scraped ${items.length} items from Vinted`);
