@@ -64,7 +64,7 @@ export default function Home() {
         </div>
         <div className="flex gap-3">
            <Button 
-             variant={useAI ? "default" : "outline"} 
+             variant={useAI ? "primary" : "outline"} 
              size="sm" 
              onClick={() => setUseAI(!useAI)}
              className={useAI ? "bg-purple-600 hover:bg-purple-700" : ""}
