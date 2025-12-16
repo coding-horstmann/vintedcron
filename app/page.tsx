@@ -88,6 +88,10 @@ export default function Home() {
     }
   };
 
+  const handleStartScanAll = () => {
+    handleStartScan();
+  };
+
   return (
     <Layout>
       {/* Header Section */}
@@ -110,7 +114,7 @@ export default function Home() {
              <Server className="mr-2 h-4 w-4" />
              Scraper Status
            </Button>
-           <Button onClick={handleStartScan} isLoading={isSearching} className="shadow-lg shadow-blue-500/20">
+           <Button onClick={handleStartScanAll} isLoading={isSearching} className="shadow-lg shadow-blue-500/20">
              {isSearching ? 'Scanning Markets...' : (
                <>
                 <Search className="mr-2 h-4 w-4" />
