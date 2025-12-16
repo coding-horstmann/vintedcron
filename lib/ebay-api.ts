@@ -204,13 +204,12 @@ export const getEbaySearchUrl = (title: string, condition: string): string => {
 };
 
 /**
- * Generiert eine URL zur eBay-Suche für VERKAUFTE Artikel
+ * Generiert eine URL zur eBay Research-Seite für VERKAUFTE Artikel
  * Verwendet für den Research-Button, zeigt historische Verkaufsdaten
+ * URL-Format: https://www.ebay.de/sh/research?marketplace=EBAY-DE&tabName=SOLD&keywords=PRODUKTTITEL
  */
 export const getEbayResearchUrl = (title: string, condition: string): string => {
-  const ebayCondition = mapConditionToEbay(condition);
-  const conditionParam = ebayCondition === 'New' ? '&LH_ItemCondition=1000' : '&LH_ItemCondition=3000';
-  // MIT LH_Sold=1 für verkaufte Artikel
-  return `https://www.ebay.de/sch/i.html?_nkw=${encodeURIComponent(title)}&LH_Sold=1&LH_Complete=1${conditionParam}`;
+  // eBay Research-Seite verwendet 'keywords' (plural) als Parameter
+  return `https://www.ebay.de/sh/research?marketplace=EBAY-DE&tabName=SOLD&keywords=${encodeURIComponent(title)}`;
 };
 
