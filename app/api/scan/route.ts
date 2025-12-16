@@ -61,24 +61,51 @@ export async function GET(request: Request) {
         
         // Alle Items verarbeiten (kein Limit mehr)
         // Für jedes Vinted Item eBay abfragen
+        const ebayApiDelay = parseInt(process.env.EBAY_API_DELAY_MS || '1000', 10); // Standard: 1000ms (1 Sekunde)
+        let consecutiveRateLimitErrors = 0;
+        const maxConsecutiveRateLimitErrors = 5; // Nach 5 aufeinanderfolgenden Fehlern überspringe eBay API
+        
         for (let i = 0; i < vintedItems.length; i++) {
           const vItem = vintedItems[i];
           try {
             let ebayResult = null;
             
-            // eBay API verwenden wenn konfiguriert
-            if (ebayConfig.appId) {
+            // eBay API verwenden wenn konfiguriert und nicht zu viele Rate-Limit-Fehler
+            if (ebayConfig.appId && consecutiveRateLimitErrors < maxConsecutiveRateLimitErrors) {
               // Rate Limiting: Warte zwischen API-Aufrufen um Rate-Limit zu vermeiden
-              // 300ms Delay zwischen Aufrufen (max ~3 Anfragen pro Sekunde)
+              // Konfigurierbares Delay (Standard: 1000ms = 1 Anfrage pro Sekunde)
               if (i > 0) {
-                await new Promise(resolve => setTimeout(resolve, 300));
+                // Erhöhe Delay bei Rate-Limit-Fehlern
+                const currentDelay = consecutiveRateLimitErrors > 0 
+                  ? ebayApiDelay * (consecutiveRateLimitErrors + 1) 
+                  : ebayApiDelay;
+                await new Promise(resolve => setTimeout(resolve, currentDelay));
               }
               
-              ebayResult = await searchEbayByTitle(
-                vItem.title,
-                vItem.condition,
-                ebayConfig
-              );
+              try {
+                ebayResult = await searchEbayByTitle(
+                  vItem.title,
+                  vItem.condition,
+                  ebayConfig
+                );
+                // Erfolgreiche Anfrage: Reset Rate-Limit-Fehler-Zähler
+                consecutiveRateLimitErrors = 0;
+              } catch (apiError: any) {
+                // Prüfe ob es ein Rate-Limit-Fehler ist
+                if (apiError?.response?.data?.errorMessage?.[0]?.error?.[0]?.errorId?.[0] === '10001') {
+                  consecutiveRateLimitErrors++;
+                  console.warn(`eBay Rate-Limit-Fehler (${consecutiveRateLimitErrors}/${maxConsecutiveRateLimitErrors}). Überspringe eBay API für verbleibende Items.`);
+                  // Überspringe eBay API für verbleibende Items wenn zu viele Fehler
+                  if (consecutiveRateLimitErrors >= maxConsecutiveRateLimitErrors) {
+                    console.warn('Zu viele Rate-Limit-Fehler. Überspringe eBay API für verbleibende Items.');
+                  }
+                } else {
+                  // Anderer Fehler: Reset Zähler
+                  consecutiveRateLimitErrors = 0;
+                }
+                // Setze ebayResult auf null, damit Fallback URL verwendet wird
+                ebayResult = null;
+              }
             }
             
             // Wenn keine eBay API oder kein Ergebnis, Fallback URL generieren
