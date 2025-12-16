@@ -78,16 +78,42 @@ async function scrapeVintedPage(url: string): Promise<{ items: any[], hasNextPag
       elements.each((_, element) => {
         const $el = $(element);
         
-        // Titel extrahieren - mehrere Varianten
-        const title = $el.find('[data-testid="item-box-title"], .item-box__title, h2, h3, h4, [class*="title"]').first().text().trim() ||
-                     $el.attr('title') ||
-                     $el.text().trim();
-        
-        // Preis extrahieren - mehrere Varianten
+        // Preis zuerst extrahieren, um ihn später aus dem Titel ausschließen zu können
         const priceText = $el.find('[data-testid="item-box-price"], .item-box__price, .price, [class*="price"], [class*="Price"]').first().text().trim() ||
                          $el.find('span:contains("€")').first().text().trim();
         const priceMatch = priceText.match(/[\d,]+/);
         const price = priceMatch ? parseFloat(priceMatch[0].replace(',', '.')) : null;
+        const priceString = priceText.replace(/[^\d,]/g, '').trim();
+        
+        // Titel extrahieren - mehrere Varianten, aber Preis ausschließen
+        let title = $el.find('[data-testid="item-box-title"], .item-box__title, h2, h3, h4, [class*="title"]').first().text().trim();
+        
+        // Wenn kein Titel gefunden, versuche andere Quellen
+        if (!title || title.length < 3) {
+          title = $el.attr('title') || '';
+        }
+        
+        // Wenn immer noch kein Titel, versuche aus Link-Text (aber nicht Preis)
+        if (!title || title.length < 3) {
+          const linkText = $el.find('a').first().text().trim();
+          // Prüfe ob Link-Text nicht nur Preis ist
+          if (linkText && !linkText.match(/^[\d,.\s€]+$/)) {
+            title = linkText;
+          }
+        }
+        
+        // Fallback: Versuche aus dem gesamten Text, aber entferne Preis
+        if (!title || title.length < 3 || title.match(/^[\d,.\s€]+$/)) {
+          const allText = $el.clone().children().remove().end().text().trim();
+          // Entferne Preis-ähnliche Muster
+          const cleanedText = allText
+            .replace(/[\d,.\s€]+/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+          if (cleanedText.length > 3) {
+            title = cleanedText;
+          }
+        }
         
         // URL extrahieren
         const relativeUrl = $el.find('a').first().attr('href') || 
@@ -96,6 +122,14 @@ async function scrapeVintedPage(url: string): Promise<{ items: any[], hasNextPag
         const url = relativeUrl 
           ? (relativeUrl.startsWith('http') ? relativeUrl : `https://www.vinted.de${relativeUrl}`)
           : null;
+        
+        // Versuche Titel aus URL zu extrahieren, falls noch kein Titel gefunden
+        if ((!title || title.length < 3 || title.match(/^[\d,.\s€]+$/)) && url) {
+          const urlMatch = url.match(/\/items\/(\d+)-([^/?]+)/);
+          if (urlMatch && urlMatch[2]) {
+            title = decodeURIComponent(urlMatch[2].replace(/-/g, ' '));
+          }
+        }
         
         // Bild extrahieren - mehrere Varianten
         const img = $el.find('img').first().attr('src') || 
@@ -109,8 +143,11 @@ async function scrapeVintedPage(url: string): Promise<{ items: any[], hasNextPag
         const conditionText = $el.find('[data-testid="item-box-condition"], .item-box__condition, .condition, [class*="condition"]').first().text().trim();
         const condition = conditionText ? mapVintedCondition(conditionText) : 'Sehr gut';
 
-        // Validierung: Mindestens Titel und URL müssen vorhanden sein
-        if (title && title.length > 3 && url && url.includes('/items/')) {
+        // Validierung: Titel darf nicht nur Preis sein
+        const isOnlyPrice = title && title.match(/^[\d,.\s€]+$/);
+        
+        // Validierung: Mindestens Titel und URL müssen vorhanden sein, Titel darf nicht nur Preis sein
+        if (title && title.length > 3 && !isOnlyPrice && url && url.includes('/items/')) {
           // Preis kann auch 0 sein oder fehlen
           const finalPrice = (price !== null && !isNaN(price) && price > 0) ? price : 0;
           

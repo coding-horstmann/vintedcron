@@ -108,8 +108,16 @@ async function searchWithFindingAPI(
       title: cheapest.title,
       shippingCost: cheapest.shippingCost
     };
-  } catch (error) {
-    console.error("eBay Finding API Error:", error);
+  } catch (error: any) {
+    // Detailliertes Logging für Debugging
+    if (error.response) {
+      console.error(`eBay Finding API Error: ${error.response.status} - ${error.response.statusText}`);
+      if (error.response.data) {
+        console.error('eBay API Response:', JSON.stringify(error.response.data).substring(0, 200));
+      }
+    } else {
+      console.error("eBay Finding API Error:", error.message || error);
+    }
     return null;
   }
 }

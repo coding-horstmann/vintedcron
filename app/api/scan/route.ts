@@ -76,11 +76,24 @@ export async function GET(request: Request) {
             
             // Wenn keine eBay API oder kein Ergebnis, Fallback URL generieren
             if (!ebayResult) {
-              const searchUrl = getEbaySearchUrl(vItem.title, vItem.condition);
+              // Stelle sicher, dass der Titel nicht nur ein Preis ist
+              let searchTitle = vItem.title;
+              // Wenn Titel nur Preis ist, versuche aus URL zu extrahieren
+              if (!searchTitle || searchTitle.match(/^[\d,.\s€]+$/)) {
+                const urlMatch = vItem.url.match(/\/items\/(\d+)-([^/?]+)/);
+                if (urlMatch && urlMatch[2]) {
+                  searchTitle = decodeURIComponent(urlMatch[2].replace(/-/g, ' '));
+                } else {
+                  // Fallback: verwende generischen Suchbegriff
+                  searchTitle = 'Artikel';
+                }
+              }
+              
+              const searchUrl = getEbaySearchUrl(searchTitle, vItem.condition);
               ebayResult = {
                 price: 0,
                 url: searchUrl,
-                title: vItem.title
+                title: searchTitle
               };
             }
             
@@ -113,7 +126,7 @@ export async function GET(request: Request) {
               ebay: {
                 price: ebayResult.price || 0,
                 url: ebayResult.url,
-                title: ebayResult.price > 0 ? ebayResult.title : 'eBay Preis nicht verfügbar (API nicht konfiguriert)'
+                title: ebayResult.price > 0 ? ebayResult.title : (ebayResult.title || vItem.title || 'eBay Preis nicht verfügbar')
               },
               profit,
               profitAfterFees,
