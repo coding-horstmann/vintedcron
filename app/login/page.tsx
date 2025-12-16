@@ -31,7 +31,8 @@ export default function LoginPage() {
       setTimeout(() => {
         const attemptTime = sessionStorage.getItem('loginAttempt');
         if (attemptTime && Date.now() - parseInt(attemptTime) > 3000) {
-          if (window.location.pathname === '/login' && !window.location.searchParams.get('password')) {
+          const urlParams = new URLSearchParams(window.location.search);
+          if (window.location.pathname === '/login' && !urlParams.get('password')) {
             setError('Falsches Passwort. Bitte versuche es erneut.');
             setIsLoading(false);
             sessionStorage.removeItem('loginAttempt');
