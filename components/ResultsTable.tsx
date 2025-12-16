@@ -174,7 +174,7 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({ deals }) => {
                           variant="outline" 
                           size="sm" 
                           className="h-8 px-2 text-xs border-purple-500/30 text-purple-400 hover:bg-purple-500/10" 
-                          onClick={() => window.open(getEbayResearchUrl(deal.vinted.title), '_blank')}
+                          onClick={() => window.open(getEbayResearchUrl(deal.vinted.title, deal.vinted.condition), '_blank')}
                           title="eBay Research - Verkaufte Artikel analysieren"
                         >
                          Research <BarChart3 className="ml-1 h-3 w-3" />

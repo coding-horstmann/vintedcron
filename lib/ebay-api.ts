@@ -192,22 +192,25 @@ async function searchWithBrowseAPI(
  * Alternative: Falls keine API verfügbar, kann man auch die eBay-Such-URL zurückgeben
  * für manuelle Überprüfung
  */
+/**
+ * Generiert eine URL zur eBay-Suche für AKTIVE Angebote
+ * Verwendet für den normalen eBay-Button
+ */
 export const getEbaySearchUrl = (title: string, condition: string): string => {
   const ebayCondition = mapConditionToEbay(condition);
   const conditionParam = ebayCondition === 'New' ? '&LH_ItemCondition=1000' : '&LH_ItemCondition=3000';
-  return `https://www.ebay.de/sch/i.html?_nkw=${encodeURIComponent(title)}&LH_Sold=1&LH_Complete=1${conditionParam}`;
+  // OHNE LH_Sold=1 für aktive Angebote
+  return `https://www.ebay.de/sch/i.html?_nkw=${encodeURIComponent(title)}&LH_Complete=1${conditionParam}`;
 };
 
 /**
- * Generiert eine URL zur eBay Research-Seite für verkaufte Artikel
- * Diese Seite zeigt detaillierte Verkaufsstatistiken für ein Produkt
- * Falls die Research-Seite nicht direkt über URL-Parameter funktioniert,
- * verwenden wir die normale eBay-Suche mit LH_Sold=1 für verkaufte Artikel
+ * Generiert eine URL zur eBay-Suche für VERKAUFTE Artikel
+ * Verwendet für den Research-Button, zeigt historische Verkaufsdaten
  */
-export const getEbayResearchUrl = (title: string): string => {
-  // Die Research-Seite scheint nicht direkt über URL-Parameter zu funktionieren
-  // Stattdessen verwenden wir die normale eBay-Suche mit LH_Sold=1 für verkaufte Artikel
-  // Dies zeigt bereits verkaufte Artikel an und funktioniert zuverlässig
-  return `https://www.ebay.de/sch/i.html?_nkw=${encodeURIComponent(title)}&LH_Sold=1&LH_Complete=1`;
+export const getEbayResearchUrl = (title: string, condition: string): string => {
+  const ebayCondition = mapConditionToEbay(condition);
+  const conditionParam = ebayCondition === 'New' ? '&LH_ItemCondition=1000' : '&LH_ItemCondition=3000';
+  // MIT LH_Sold=1 für verkaufte Artikel
+  return `https://www.ebay.de/sch/i.html?_nkw=${encodeURIComponent(title)}&LH_Sold=1&LH_Complete=1${conditionParam}`;
 };
 
