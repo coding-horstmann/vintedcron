@@ -44,6 +44,20 @@ export default function SettingsPage() {
             url: 'https://www.vinted.de/catalog?catalog[]=2320&status_ids[]=1&status_ids[]=2&status_ids[]=6&order=newest_first',
             category: 'Bücher & Medien - Sachbücher',
             enabled: true
+          },
+          {
+            id: 'comics-manga-all',
+            name: 'Comics/Manga (Sehr gut, Neu, Neu mit Etikett)',
+            url: 'https://www.vinted.de/catalog?catalog[]=5425&status_ids[]=1&status_ids[]=2&status_ids[]=6&order=newest_first',
+            category: 'Bücher & Medien - Comics/Manga',
+            enabled: true
+          },
+          {
+            id: 'spiele-neu',
+            name: 'Spiele (Nur Neu)',
+            url: 'https://www.vinted.de/catalog?catalog[]=3026&status_ids[]=6&order=newest_first',
+            category: 'Unterhaltung - Spiele',
+            enabled: true
           }
         ]);
       }
