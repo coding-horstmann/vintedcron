@@ -17,23 +17,40 @@ export default function LoginPage() {
     try {
       // Weiterleitung mit Passwort als Query-Parameter
       // Die Middleware prüft das Passwort
-      // Wenn falsch, werden wir zurück zur Login-Seite weitergeleitet
       const currentUrl = new URL(window.location.href);
       const returnUrl = currentUrl.searchParams.get('return') || '/';
-      window.location.href = `${returnUrl}?password=${encodeURIComponent(password)}`;
+      const loginUrl = `${returnUrl}?password=${encodeURIComponent(password)}`;
       
-      // Wenn nach 2 Sekunden noch auf Login-Seite, war Passwort falsch
+      // Speichere den aktuellen Zeitstempel, um zu erkennen ob wir zurückgeleitet wurden
+      sessionStorage.setItem('loginAttempt', Date.now().toString());
+      
+      // Weiterleitung
+      window.location.href = loginUrl;
+      
+      // Fallback: Wenn nach 3 Sekunden noch auf Login-Seite, war Passwort wahrscheinlich falsch
       setTimeout(() => {
-        if (window.location.pathname === '/login') {
-          setError('Falsches Passwort. Bitte versuche es erneut.');
-          setIsLoading(false);
+        const attemptTime = sessionStorage.getItem('loginAttempt');
+        if (attemptTime && Date.now() - parseInt(attemptTime) > 3000) {
+          if (window.location.pathname === '/login' && !window.location.searchParams.get('password')) {
+            setError('Falsches Passwort. Bitte versuche es erneut.');
+            setIsLoading(false);
+            sessionStorage.removeItem('loginAttempt');
+          }
         }
-      }, 2000);
+      }, 3000);
     } catch (err) {
       setError('Fehler beim Anmelden. Bitte versuche es erneut.');
       setIsLoading(false);
     }
   };
+
+  // Prüfe ob es einen Fehler-Parameter in der URL gibt
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('error') === 'auth_failed') {
+      setError('Falsches Passwort. Bitte versuche es erneut.');
+    }
+  }, []);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">

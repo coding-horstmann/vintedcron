@@ -22,18 +22,27 @@ export function middleware(request: NextRequest) {
   const url = request.nextUrl.clone();
   const providedPassword = url.searchParams.get('password');
 
-  if (providedPassword === password) {
-    // Passwort korrekt - Cookie setzen und weiterleiten
-    const response = NextResponse.next();
-    response.cookies.set('authenticated', 'true', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 30 // 30 Tage
-    });
-    // Entferne Passwort aus URL
-    url.searchParams.delete('password');
-    return NextResponse.redirect(url);
+  // Wenn ein Passwort übergeben wurde, prüfe es
+  if (providedPassword !== null) {
+    if (providedPassword === password) {
+      // Passwort korrekt - Cookie setzen und weiterleiten
+      // Entferne Passwort aus URL
+      url.searchParams.delete('password');
+      const response = NextResponse.redirect(url);
+      response.cookies.set('authenticated', 'true', {
+        httpOnly: true,
+        secure: true, // Immer secure auf Vercel (HTTPS)
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 30, // 30 Tage
+        path: '/'
+      });
+      return response;
+    } else {
+      // Falsches Passwort - zur Login-Seite mit Fehler
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('error', 'auth_failed');
+      return NextResponse.redirect(loginUrl);
+    }
   }
 
   // Wenn bereits auf Login-Seite, erlauben
