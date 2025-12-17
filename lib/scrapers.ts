@@ -142,11 +142,14 @@ function getLanguageBookId(language: string): string | null {
   const languageMap: Record<string, string> = {
     'Deutsch': '6437',
     'German': '6437',
-    // Weitere IDs können hier hinzugefügt werden, wenn bekannt
-    // 'Französisch': 'XXXX',
-    // 'Englisch': 'XXXX',
-    // 'Niederländisch': 'XXXX',
-    // 'Italienisch': 'XXXX',
+    'Englisch': '6435',
+    'English': '6435',
+    'Französisch': '6436',
+    'French': '6436',
+    'Niederländisch': '6441',
+    'Dutch': '6441',
+    'Italienisch': '6439',
+    'Italian': '6439',
   };
   
   return languageMap[language] || null;
