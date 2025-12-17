@@ -135,6 +135,51 @@ function normalizeLanguage(languageText: string): string {
 }
 
 /**
+ * Mappt Sprachnamen zu Vinted language_book_ids
+ * Basierend auf: https://www.vinted.de/catalog?...&language_book_ids[]=6437 (Deutsch)
+ */
+function getLanguageBookId(language: string): string | null {
+  const languageMap: Record<string, string> = {
+    'Deutsch': '6437',
+    'German': '6437',
+    // Weitere IDs können hier hinzugefügt werden, wenn bekannt
+    // 'Französisch': 'XXXX',
+    // 'Englisch': 'XXXX',
+    // 'Niederländisch': 'XXXX',
+    // 'Italienisch': 'XXXX',
+  };
+  
+  return languageMap[language] || null;
+}
+
+/**
+ * Erweitert eine Vinted URL um den language_book_ids Parameter
+ */
+function addLanguageFilterToUrl(url: string, language: string): string {
+  if (!language || language === 'Alle Sprachen') {
+    return url;
+  }
+  
+  const languageId = getLanguageBookId(language);
+  if (!languageId) {
+    console.warn(`Unbekannte Sprache-ID für "${language}". Verwende URL ohne Sprachfilter.`);
+    return url;
+  }
+  
+  try {
+    const urlObj = new URL(url);
+    // Entferne vorhandene language_book_ids Parameter
+    urlObj.searchParams.delete('language_book_ids[]');
+    // Füge neuen Parameter hinzu
+    urlObj.searchParams.append('language_book_ids[]', languageId);
+    return urlObj.toString();
+  } catch (error) {
+    console.error('Fehler beim Hinzufügen des Sprachfilters zur URL:', error);
+    return url;
+  }
+}
+
+/**
  * Scraped eine einzelne Vinted-Seite
  */
 async function scrapeVintedPage(url: string): Promise<{ items: any[], hasNextPage: boolean, nextPageUrl?: string }> {
@@ -421,10 +466,17 @@ function extractItemsFromJSON(data: any): any[] {
  */
 export const scrapeVintedCatalogUrl = async (catalogUrl: string, maxPages: number = 3, languageFilter?: string) => {
   try {
-    console.log(`Starting scrape of Vinted catalog: ${catalogUrl}${languageFilter && languageFilter !== 'Alle Sprachen' ? ` (Sprache: ${languageFilter})` : ''}`);
+    // Erweitere URL um Sprachfilter, falls angegeben
+    let urlToScrape = catalogUrl;
+    if (languageFilter && languageFilter !== 'Alle Sprachen') {
+      urlToScrape = addLanguageFilterToUrl(catalogUrl, languageFilter);
+      console.log(`Starting scrape of Vinted catalog: ${urlToScrape} (Sprache: ${languageFilter})`);
+    } else {
+      console.log(`Starting scrape of Vinted catalog: ${urlToScrape}`);
+    }
     
     const allItems: any[] = [];
-    let currentUrl: string | undefined = catalogUrl;
+    let currentUrl: string | undefined = urlToScrape;
     let pageCount = 0;
     let consecutiveEmptyPages = 0;
 
@@ -435,84 +487,10 @@ export const scrapeVintedCatalogUrl = async (catalogUrl: string, maxPages: numbe
       const { items, hasNextPage, nextPageUrl } = await scrapeVintedPage(currentUrl);
       
       if (items.length > 0) {
-        // Wenn Sprache-Filter aktiv ist und Sprache noch nicht bekannt, extrahiere sie von Produktseiten
-        if (languageFilter && languageFilter !== 'Alle Sprachen') {
-          // Sequenzielle Verarbeitung statt parallel, um Rate-Limiting zu vermeiden
-          const itemsWithLanguage: any[] = [];
-          let rateLimitErrors = 0;
-          const maxRateLimitErrors = 3; // Nach 3 Fehlern stoppe Sprachextraktion
-          
-          for (let i = 0; i < items.length; i++) {
-            const item = items[i];
-            
-            // Wenn Sprache bereits vorhanden, verwende sie
-            if (item.language) {
-              itemsWithLanguage.push(item);
-              continue;
-            }
-            
-            // Wenn zu viele Rate-Limit-Fehler, überspringe weitere Sprachextraktion
-            if (rateLimitErrors >= maxRateLimitErrors) {
-              console.warn(`Zu viele Rate-Limit-Fehler bei Sprachextraktion. Überspringe verbleibende ${items.length - i} Items.`);
-              // Füge verbleibende Items ohne Sprache hinzu
-              itemsWithLanguage.push(...items.slice(i).map(it => ({ ...it, language: undefined })));
-              break;
-            }
-            
-            try {
-              // Sonst extrahiere Sprache von Produktseite (sequenziell)
-              const language = await scrapeVintedItemLanguage(item.url);
-              itemsWithLanguage.push({ ...item, language: language || undefined });
-              
-              // Reset Rate-Limit-Fehler bei Erfolg
-              rateLimitErrors = 0;
-            } catch (error: any) {
-              // Prüfe ob es ein Rate-Limit-Fehler ist (429)
-              if (error?.response?.status === 429) {
-                rateLimitErrors++;
-                console.warn(`Rate-Limit-Fehler bei Sprachextraktion (${rateLimitErrors}/${maxRateLimitErrors}). Warte länger...`);
-                // Warte länger bei Rate-Limit-Fehler
-                await new Promise(resolve => setTimeout(resolve, 5000 + Math.random() * 5000));
-                
-                // Versuche nochmal (nur einmal)
-                if (rateLimitErrors < maxRateLimitErrors) {
-                  try {
-                    await new Promise(resolve => setTimeout(resolve, 5000));
-                    const language = await scrapeVintedItemLanguage(item.url);
-                    itemsWithLanguage.push({ ...item, language: language || undefined });
-                    rateLimitErrors = 0; // Reset bei Erfolg
-                  } catch (retryError) {
-                    // Bei erneutem Fehler, füge Item ohne Sprache hinzu
-                    itemsWithLanguage.push({ ...item, language: undefined });
-                  }
-                } else {
-                  itemsWithLanguage.push({ ...item, language: undefined });
-                }
-              } else {
-                // Anderer Fehler: Füge Item ohne Sprache hinzu
-                itemsWithLanguage.push({ ...item, language: undefined });
-              }
-            }
-          }
-          
-          // Filtere nach Sprache
-          const filteredItems = itemsWithLanguage.filter(item => {
-            if (!languageFilter || languageFilter === 'Alle Sprachen') {
-              return true;
-            }
-            // Wenn Sprache nicht gefunden wurde, behalte Item (könnte ein Fehler sein)
-            if (!item.language) {
-              return true; // Behalte Items ohne Sprache, um nichts zu verlieren
-            }
-            return item.language === languageFilter;
-          });
-          
-          allItems.push(...filteredItems);
-          console.log(`Found ${items.length} items on page ${pageCount}, ${filteredItems.length} passen Sprachfilter (Total: ${allItems.length})`);
-        } else {
-          allItems.push(...items);
-          console.log(`Found ${items.length} items on page ${pageCount} (Total: ${allItems.length})`);
-        }
+        // Wenn URL bereits Sprachfilter enthält, sind alle Items bereits gefiltert
+        // Füge Items direkt hinzu (Sprache ist bereits in der URL gefiltert)
+        allItems.push(...items);
+        console.log(`Found ${items.length} items on page ${pageCount} (Total: ${allItems.length})`);
         
         consecutiveEmptyPages = 0;
       } else {
@@ -531,7 +509,12 @@ export const scrapeVintedCatalogUrl = async (catalogUrl: string, maxPages: numbe
         break;
       }
 
-      currentUrl = nextPageUrl;
+      // Stelle sicher, dass der Sprachfilter auch in der nächsten Seite erhalten bleibt
+      if (languageFilter && languageFilter !== 'Alle Sprachen') {
+        currentUrl = addLanguageFilterToUrl(nextPageUrl, languageFilter);
+      } else {
+        currentUrl = nextPageUrl;
+      }
     }
 
     console.log(`Scraped ${allItems.length} total items from ${pageCount} pages`);
