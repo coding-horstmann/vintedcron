@@ -157,7 +157,7 @@ function getLanguageBookId(language: string): string | null {
 
 /**
  * Erweitert eine Vinted URL um den language_book_ids Parameter
- * Vinted verwendet eckige Klammern in Parameternamen, die speziell behandelt werden müssen
+ * searchParams.append() kodiert automatisch korrekt (%5B%5D für [])
  */
 function addLanguageFilterToUrl(url: string, language: string): string {
   if (!language || language === 'Alle Sprachen') {
@@ -173,23 +173,11 @@ function addLanguageFilterToUrl(url: string, language: string): string {
   try {
     const urlObj = new URL(url);
     
-    // Entferne vorhandene language_book_ids Parameter (verschiedene Varianten)
-    const paramsToDelete: string[] = [];
-    urlObj.searchParams.forEach((value, key) => {
-      if (key.startsWith('language_book_ids')) {
-        paramsToDelete.push(key);
-      }
-    });
-    paramsToDelete.forEach(key => urlObj.searchParams.delete(key));
+    // Entferne vorhandene language_book_ids Parameter
+    urlObj.searchParams.delete('language_book_ids[]');
     
-    // Füge den Parameter manuell hinzu, da searchParams eckige Klammern kodiert
-    // Vinted erwartet: language_book_ids[]=6437 (nicht kodiert)
-    const searchParams = urlObj.searchParams.toString();
-    const separator = searchParams ? '&' : '';
-    const newParam = `language_book_ids[]=${languageId}`;
-    
-    // Manuell zusammenbauen, um die eckigen Klammern nicht zu kodieren
-    urlObj.search = searchParams + separator + newParam;
+    // Füge neuen Parameter hinzu - searchParams.append() kodiert automatisch korrekt
+    urlObj.searchParams.append('language_book_ids[]', languageId);
     
     return urlObj.toString();
   } catch (error) {
