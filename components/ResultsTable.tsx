@@ -13,7 +13,7 @@ type SortColumn = 'vintedPrice' | 'ebayPrice' | 'profitAfterFees' | 'roi';
 type SortDirection = 'asc' | 'desc';
 
 export const ResultsTable: React.FC<ResultsTableProps> = ({ deals }) => {
-  const [sortColumn, setSortColumn] = useState<SortColumn>('profitAfterFees');
+  const [sortColumn, setSortColumn] = useState<SortColumn>('ebayPrice');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
   const sortedDeals = useMemo(() => {
@@ -100,17 +100,8 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({ deals }) => {
                   onClick={() => handleSort('ebayPrice')}
                 >
                   <div className="flex items-center gap-2">
-                    eBay (Sell)
+                    eBay (inkl. Versand)
                     <SortIcon column="ebayPrice" />
-                  </div>
-                </th>
-                <th 
-                  className="p-4 font-medium cursor-pointer hover:text-slate-200 transition-colors select-none"
-                  onClick={() => handleSort('profitAfterFees')}
-                >
-                  <div className="flex items-center gap-2">
-                    Net Profit
-                    <SortIcon column="profitAfterFees" />
                   </div>
                 </th>
                 <th 
@@ -141,15 +132,6 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({ deals }) => {
                     </td>
                     <td className="p-4 font-medium text-slate-300">{formatCurrency(deal.vinted.price)}</td>
                     <td className="p-4 font-medium text-slate-300">{formatCurrency(deal.ebay.price)}</td>
-                    <td className="p-4">
-                    <div className="flex flex-col">
-                        <span className={cn(
-                            "font-bold",
-                            deal.profitAfterFees > 0 ? "text-secondary" : "text-red-400"
-                        )}>{formatCurrency(deal.profitAfterFees)}</span>
-                        <span className="text-[10px] text-slate-500">after fees & ship</span>
-                    </div>
-                    </td>
                     <td className="p-4">
                     <div className={cn(
                         "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border",
