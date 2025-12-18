@@ -10,19 +10,16 @@ export async function GET(request: Request) {
   try {
     const deals: ArbitrageDeal[] = [];
     
-    // eBay API Konfiguration aus Umgebungsvariablen
+    // eBay API Konfiguration aus Umgebungsvariablen (OAuth2)
     const ebayConfig = {
-      appId: process.env.EBAY_APP_ID || '',
-      certId: process.env.EBAY_CERT_ID,
-      devId: process.env.EBAY_DEV_ID,
-      authToken: process.env.EBAY_AUTH_TOKEN,
-      siteId: process.env.EBAY_SITE_ID || '77', // 77 = Deutschland
-      apiVersion: (process.env.EBAY_API_VERSION as 'finding' | 'browse') || 'finding'
+      clientId: process.env.EBAY_CLIENT_ID || '',
+      clientSecret: process.env.EBAY_CLIENT_SECRET || '',
+      marketplaceId: process.env.EBAY_MARKETPLACE_ID || 'EBAY_DE' // EBAY_DE, EBAY_US, etc.
     };
 
     // Prüfe ob eBay API konfiguriert ist
-    if (!ebayConfig.appId) {
-      console.warn('eBay API nicht konfiguriert. Setze EBAY_APP_ID in Umgebungsvariablen.');
+    if (!ebayConfig.clientId || !ebayConfig.clientSecret) {
+      console.warn('eBay OAuth2 API nicht konfiguriert. Setze EBAY_CLIENT_ID und EBAY_CLIENT_SECRET in Umgebungsvariablen.');
     }
 
     // URLs aus Request-Query oder Standard-URLs verwenden
@@ -74,9 +71,9 @@ export async function GET(request: Request) {
             let ebayResult = null;
             
             // eBay API verwenden wenn konfiguriert und nicht zu viele Rate-Limit-Fehler
-            if (ebayConfig.appId && consecutiveRateLimitErrors < maxConsecutiveRateLimitErrors) {
+            if (ebayConfig.clientId && ebayConfig.clientSecret && consecutiveRateLimitErrors < maxConsecutiveRateLimitErrors) {
               // Rate Limiting: Warte zwischen API-Aufrufen um Rate-Limit zu vermeiden
-              // Konfigurierbares Delay (Standard: 1000ms = 1 Anfrage pro Sekunde)
+              // Konfigurierbares Delay (Standard: 10000ms = 10 Sekunden = 6 Anfragen/Minute)
               if (i > 0) {
                 // Erhöhe Delay bei Rate-Limit-Fehlern
                 const currentDelay = consecutiveRateLimitErrors > 0 
@@ -95,7 +92,7 @@ export async function GET(request: Request) {
                 consecutiveRateLimitErrors = 0;
               } catch (apiError: any) {
                 // Prüfe ob es ein Rate-Limit-Fehler ist
-                if (apiError?.response?.data?.errorMessage?.[0]?.error?.[0]?.errorId?.[0] === '10001') {
+                if (apiError?.message === 'RATE_LIMIT' || apiError?.response?.status === 429) {
                   consecutiveRateLimitErrors++;
                   console.warn(`eBay Rate-Limit-Fehler (${consecutiveRateLimitErrors}/${maxConsecutiveRateLimitErrors}). Überspringe eBay API für verbleibende Items.`);
                   // Überspringe eBay API für verbleibende Items wenn zu viele Fehler
@@ -140,7 +137,7 @@ export async function GET(request: Request) {
             let roi = 0;
             
             // Berechne Profit nur wenn eBay Preis verfügbar
-            if (ebayConfig.appId && ebayResult.price > 0 && vItem.price > 0) {
+            if (ebayConfig.clientId && ebayConfig.clientSecret && ebayResult.price > 0 && vItem.price > 0) {
               profit = ebayResult.price - vItem.price;
               const fees = ebayResult.price * 0.11; // eBay Gebühren ~11%
               const shipping = 4.50; // Geschätzter Versand
@@ -174,7 +171,7 @@ export async function GET(request: Request) {
             });
             
             // Rate Limiting zwischen eBay API Calls
-            if (ebayConfig.appId) {
+            if (ebayConfig.clientId && ebayConfig.clientSecret) {
               await new Promise(resolve => setTimeout(resolve, 500));
             }
           } catch (itemError) {

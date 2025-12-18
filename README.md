@@ -28,19 +28,14 @@ Erstelle eine `.env.local` Datei basierend auf `env.example`:
 # Gemini AI API Key (optional - nur für KI-Fallback)
 GEMINI_API_KEY=your_gemini_api_key_here
 
-# eBay API Konfiguration (erforderlich für echte Preise)
-EBAY_APP_ID=your_ebay_app_id_here
-EBAY_CERT_ID=your_ebay_cert_id_here
-EBAY_DEV_ID=your_ebay_dev_id_here
+# eBay API Konfiguration (OAuth2 - erforderlich für echte Preise)
+# Erhältlich von: https://developer.ebay.com/
+EBAY_CLIENT_ID=your_ebay_client_id_here
+EBAY_CLIENT_SECRET=your_ebay_client_secret_here
 
-# eBay OAuth Token (für Browse API - optional)
-EBAY_AUTH_TOKEN=your_ebay_auth_token_here
-
-# eBay API Version: 'finding' oder 'browse' (Standard: finding)
-EBAY_API_VERSION=finding
-
-# eBay Site ID (77 = Deutschland)
-EBAY_SITE_ID=77
+# eBay Marketplace ID (Standard: EBAY_DE für Deutschland)
+# Verfügbare IDs: EBAY_DE, EBAY_US, EBAY_GB, etc.
+EBAY_MARKETPLACE_ID=EBAY_DE
 ```
 
 3. App starten:
@@ -78,9 +73,9 @@ Bearbeite `config/vinted-urls.json` um URLs hinzuzufügen oder zu entfernen:
 ### eBay API Setup
 
 1. Registriere dich bei [eBay Developers](https://developer.ebay.com/)
-2. Erstelle eine neue App
-3. Kopiere `App ID`, `Cert ID` und `Dev ID` in deine `.env.local`
-4. Für Browse API: Generiere einen OAuth Token
+2. Erstelle eine neue App (Production oder Sandbox)
+3. Kopiere `Client ID` (App ID) und `Client Secret` in deine `.env.local`
+4. Die App verwendet automatisch OAuth2 Token-Caching (Token wird 2 Stunden gecacht)
 
 ## Verwendung
 
@@ -93,7 +88,7 @@ Bearbeite `config/vinted-urls.json` um URLs hinzuzufügen oder zu entfernen:
 - **Frontend**: React + TypeScript + Vite
 - **Backend**: Next.js API Routes
 - **Scraping**: Axios + Cheerio (Vinted)
-- **API**: eBay Finding/Browse API
+- **API**: eBay Browse API mit OAuth2 (automatisches Token-Caching)
 - **KI**: Google Gemini (optional)
 
 ## Deployment auf Vercel
