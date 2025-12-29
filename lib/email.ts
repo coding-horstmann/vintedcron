@@ -9,24 +9,43 @@ interface EmailConfig {
 }
 
 /**
+ * Bereinigt E-Mail-Adresse von ungültigen Zeichen
+ */
+function cleanEmail(email: string): string {
+  return (email || '')
+    .trim()
+    .replace(/^["'=\s\r\n]+/, '') // Entferne führende ", ', =, Leerzeichen, Zeilenumbrüche
+    .replace(/["'=\s\r\n]+$/, '') // Entferne nachfolgende
+    .replace(/[\r\n]/g, '');       // Entferne alle Zeilenumbrüche
+}
+
+/**
  * Erstellt einen Nodemailer-Transporter für Gmail
+ * Verwendet Port 587 mit STARTTLS (besser kompatibel mit Cloud-Hosting)
  */
 function createTransporter(config: EmailConfig) {
+  // Bereinige E-Mail-Adressen
+  const cleanFrom = cleanEmail(config.from);
+  const cleanPassword = (config.gmailAppPassword || '')
+    .trim()
+    .replace(/[\r\n\s]/g, ''); // Entferne Leerzeichen und Zeilenumbrüche
+  
+  console.log(`[EMAIL] Erstelle Transporter: FROM=${cleanFrom}, PASSWORD_LENGTH=${cleanPassword.length}`);
+  
   return nodemailer.createTransport({
-    service: 'gmail',
     host: 'smtp.gmail.com',
-    port: 465,
-    secure: true, // true für Port 465, false für andere Ports
+    port: 587, // Port 587 mit STARTTLS (besser für Cloud-Hosting)
+    secure: false, // STARTTLS
     auth: {
-      user: config.from,
-      pass: config.gmailAppPassword,
+      user: cleanFrom,
+      pass: cleanPassword,
     },
-    connectionTimeout: 10000, // 10 Sekunden
-    greetingTimeout: 10000,
-    socketTimeout: 10000,
-    // Zusätzliche Optionen für bessere Kompatibilität
+    connectionTimeout: 30000, // 30 Sekunden
+    greetingTimeout: 30000,
+    socketTimeout: 30000,
     tls: {
-      rejectUnauthorized: false
+      rejectUnauthorized: false,
+      ciphers: 'SSLv3'
     }
   });
 }
@@ -154,26 +173,42 @@ export async function sendArbitrageEmail(
     // Filtere Deals nach Min-ROI
     const filteredDeals = deals.filter(deal => deal.roi >= validMinRoi);
     
+    // Bereinige E-Mail-Adressen
+    const cleanFrom = cleanEmail(config.from);
+    const cleanTo = cleanEmail(config.to);
+    
     console.log(`[EMAIL] Sende E-Mail mit ${filteredDeals.length} Deals (ROI >= ${validMinRoi}%)`);
+    console.log(`[EMAIL] FROM: "${cleanFrom}" (original: ${config.from?.length} Zeichen)`);
+    console.log(`[EMAIL] TO: "${cleanTo}" (original: ${config.to?.length} Zeichen)`);
+    
+    // Prüfe ob Bereinigung nötig war
+    if (config.from !== cleanFrom) {
+      console.warn(`[EMAIL] WARNUNG: EMAIL_FROM wurde bereinigt!`);
+    }
+    if (config.to !== cleanTo) {
+      console.warn(`[EMAIL] WARNUNG: EMAIL_TO wurde bereinigt!`);
+    }
     
     // Wenn keine Deals den Filter erfüllen, trotzdem E-Mail senden (mit Info)
     const transporter = createTransporter(config);
     const scanTime = new Date();
     
     const mailOptions = {
-      from: `VintedHunter <${config.from}>`,
-      to: config.to,
+      from: `VintedHunter <${cleanFrom}>`,
+      to: cleanTo,
       subject: filteredDeals.length > 0 
         ? `🎯 ${filteredDeals.length} Arbitrage-Deals gefunden (ROI ≥${validMinRoi}%)` 
         : `📊 VintedHunter Scan: Keine Deals mit ROI ≥${validMinRoi}%`,
       html: generateEmailHTML(filteredDeals, scanTime),
     };
 
-    // E-Mail mit Timeout senden
+    console.log(`[EMAIL] Versuche E-Mail zu senden...`);
+    
+    // E-Mail mit längerem Timeout senden
     await Promise.race([
       transporter.sendMail(mailOptions),
       new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('E-Mail Timeout nach 15 Sekunden')), 15000)
+        setTimeout(() => reject(new Error('E-Mail Timeout nach 60 Sekunden')), 60000)
       )
     ]);
     
