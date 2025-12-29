@@ -38,12 +38,18 @@ export async function GET(request: Request) {
       marketplaceId: process.env.EBAY_MARKETPLACE_ID || 'EBAY_DE'
     };
 
+    // Debug: Log eBay Config Status
+    console.log(`[CRON] eBay API Config: ClientID=${ebayConfig.clientId ? 'gesetzt' : 'FEHLT'}, ClientSecret=${ebayConfig.clientSecret ? 'gesetzt' : 'FEHLT'}`);
+
     // E-Mail Konfiguration
     const emailConfig = {
       from: process.env.EMAIL_FROM || '',
       to: process.env.EMAIL_TO || '',
       gmailAppPassword: process.env.GMAIL_APP_PASSWORD || ''
     };
+
+    // Debug: Log E-Mail Config Status
+    console.log(`[CRON] E-Mail Config: FROM=${emailConfig.from ? 'gesetzt' : 'FEHLT'}, TO=${emailConfig.to ? 'gesetzt' : 'FEHLT'}, PASSWORD=${emailConfig.gmailAppPassword ? 'gesetzt' : 'FEHLT'}`);
 
     // Min. ROI für E-Mail-Benachrichtigung
     const minRoiForEmail = parseInt(process.env.MIN_ROI_EMAIL || '150', 10);
@@ -76,6 +82,15 @@ export async function GET(request: Request) {
         // eBay API Delay
         const ebayApiDelay = parseInt(process.env.EBAY_API_DELAY_MS || '2000', 10);
         
+        // Debug: Log ob eBay API verwendet wird
+        if (!ebayConfig.clientId || !ebayConfig.clientSecret) {
+          console.log(`[CRON] WARNUNG: eBay API nicht konfiguriert. Deals werden ohne eBay-Preisvergleich erstellt.`);
+        } else {
+          console.log(`[CRON] eBay API konfiguriert. Starte Preisvergleich für ${vintedItems.length} Artikel...`);
+        }
+        
+        let ebayApiCallCount = 0;
+        
         for (let i = 0; i < vintedItems.length; i++) {
           const vItem = vintedItems[i];
           
@@ -89,6 +104,10 @@ export async function GET(request: Request) {
               }
               
               try {
+                ebayApiCallCount++;
+                if (ebayApiCallCount % 10 === 0) {
+                  console.log(`[CRON] eBay API: ${ebayApiCallCount}/${vintedItems.length} Artikel verarbeitet...`);
+                }
                 ebayResult = await searchEbayByTitle(
                   vItem.title,
                   vItem.condition,
@@ -150,6 +169,10 @@ export async function GET(request: Request) {
             console.error(`[CRON] Fehler bei Item "${vItem.title}":`, itemError);
             continue;
           }
+        }
+        
+        if (ebayConfig.clientId && ebayConfig.clientSecret) {
+          console.log(`[CRON] ${urlConfig.name}: ${ebayApiCallCount} eBay API Calls durchgeführt`);
         }
       } catch (urlError) {
         console.error(`[CRON] Fehler bei ${urlConfig.name}:`, urlError);
