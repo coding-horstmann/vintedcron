@@ -22,7 +22,24 @@ async function runCronJob() {
     
     console.log(`[CRON] Starte automatischen Scan via ${baseUrl}/api/cron`);
     
-    const response = await fetch(`${baseUrl}/api/cron`);
+    // Längeres Timeout für lange Scans (30 Minuten)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30 * 60 * 1000);
+    
+    const response = await fetch(`${baseUrl}/api/cron`, {
+      signal: controller.signal,
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP ${response.status}: ${errorText}`);
+    }
+    
     const data = await response.json();
     
     if (data.success) {

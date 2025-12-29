@@ -130,9 +130,16 @@ async function sendViaResend(
   to: string,
   subject: string,
   html: string,
-  resendApiKey: string
+  resendApiKey: string,
+  fromEmail?: string
 ): Promise<void> {
   console.log(`[EMAIL] Sende via Resend API...`);
+  
+  // Verwende verifizierte Domain oder Fallback auf Test-Absender
+  // Format: "Name <email@domain.de>" oder "email@domain.de"
+  const from = fromEmail || 'VintedHunter <onboarding@resend.dev>';
+  
+  console.log(`[EMAIL] Absender: ${from}`);
   
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -141,7 +148,7 @@ async function sendViaResend(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: 'VintedHunter <onboarding@resend.dev>', // Resend's Default-Absender
+      from: from,
       to: [to],
       subject: subject,
       html: html,
@@ -228,11 +235,12 @@ export async function sendArbitrageEmail(
 
     // Prüfe ob Resend API Key vorhanden
     const resendApiKey = process.env.RESEND_API_KEY;
+    const resendFromEmail = process.env.RESEND_FROM_EMAIL; // z.B. "VintedHunter <noreply@lax-republic.de>"
     
     if (resendApiKey) {
       // Methode 1: Resend API (HTTP-basiert, funktioniert auf Railway)
       console.log(`[EMAIL] Verwende Resend API (HTTP)`);
-      await sendViaResend(cleanTo, subject, html, resendApiKey);
+      await sendViaResend(cleanTo, subject, html, resendApiKey, resendFromEmail);
     } else if (cleanFrom && cleanPassword) {
       // Methode 2: Gmail SMTP (Fallback, funktioniert nicht auf Railway)
       console.log(`[EMAIL] Verwende Gmail SMTP (Fallback)`);
