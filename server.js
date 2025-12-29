@@ -4,13 +4,16 @@ import next from 'next';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = '0.0.0.0';
+// Railway setzt PORT, verwende diesen explizit
 const port = parseInt(process.env.PORT || '3000', 10);
 
-const app = next({ dev, hostname, port });
+console.log(`Starting server on port ${port} (PORT env: ${process.env.PORT || 'not set'})`);
+
+const app = next({ dev, hostname });
 const handle = app.getRequestHandler();
 
 app.prepare().then(() => {
-  createServer(async (req, res) => {
+  const server = createServer(async (req, res) => {
     try {
       const parsedUrl = parse(req.url, true);
       await handle(req, res, parsedUrl);
@@ -19,9 +22,11 @@ app.prepare().then(() => {
       res.statusCode = 500;
       res.end('internal server error');
     }
-  }).listen(port, hostname, (err) => {
-    if (err) throw err;
+  });
+
+  server.listen(port, hostname, () => {
     console.log(`> Ready on http://${hostname}:${port}`);
+    console.log(`> Server listening on PORT: ${port}`);
   });
 });
 
