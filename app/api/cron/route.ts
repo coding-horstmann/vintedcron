@@ -51,11 +51,19 @@ export async function GET(request: Request) {
     // Debug: Log E-Mail Config Status
     console.log(`[CRON] E-Mail Config: FROM=${emailConfig.from ? 'gesetzt' : 'FEHLT'}, TO=${emailConfig.to ? 'gesetzt' : 'FEHLT'}, PASSWORD=${emailConfig.gmailAppPassword ? 'gesetzt' : 'FEHLT'}`);
 
-    // Min. ROI für E-Mail-Benachrichtigung
-    const minRoiForEmail = parseInt(process.env.MIN_ROI_EMAIL || '150', 10);
-
-    // Seitenlimit aus Umgebungsvariable
-    const maxPages = parseInt(process.env.MAX_SCAN_PAGES || '3', 10);
+    // Min. ROI für E-Mail-Benachrichtigung (mit Fallback)
+    const minRoiEnv = process.env.MIN_ROI_EMAIL;
+    const minRoiForEmail = minRoiEnv && !isNaN(Number(minRoiEnv)) 
+      ? parseInt(minRoiEnv, 10) 
+      : 150;
+    
+    // Seitenlimit aus Umgebungsvariable (mit Fallback)
+    const maxPagesEnv = process.env.MAX_SCAN_PAGES;
+    const maxPages = maxPagesEnv && !isNaN(Number(maxPagesEnv)) 
+      ? parseInt(maxPagesEnv, 10) 
+      : 3;
+    
+    console.log(`[CRON] Konfiguration: MAX_SCAN_PAGES=${maxPages}, MIN_ROI_EMAIL=${minRoiForEmail}`);
     
     // Alle aktivierten URLs durchgehen
     const enabledUrls = vintedUrls.urls.filter(u => u.enabled);
@@ -187,9 +195,20 @@ export async function GET(request: Request) {
     let emailResult = { success: false, message: 'E-Mail nicht konfiguriert', filteredCount: 0 };
     
     if (emailConfig.from && emailConfig.to && emailConfig.gmailAppPassword) {
-      console.log(`[CRON] Sende E-Mail an ${emailConfig.to} (Min. ROI: ${minRoiForEmail}%)...`);
-      emailResult = await sendArbitrageEmail(deals, emailConfig, minRoiForEmail);
-      console.log(`[CRON] E-Mail: ${emailResult.message} (${emailResult.filteredCount} Deals mit ROI >= ${minRoiForEmail}%)`);
+      console.log(`[CRON] Sende E-Mail von "${emailConfig.from}" an "${emailConfig.to}" (Min. ROI: ${minRoiForEmail}%)...`);
+      console.log(`[CRON] E-Mail Config Details: FROM="${emailConfig.from}", TO="${emailConfig.to}", PASSWORD_LENGTH=${emailConfig.gmailAppPassword.length}`);
+      
+      try {
+        emailResult = await sendArbitrageEmail(deals, emailConfig, minRoiForEmail);
+        console.log(`[CRON] E-Mail: ${emailResult.message} (${emailResult.filteredCount} Deals mit ROI >= ${minRoiForEmail}%)`);
+      } catch (emailError) {
+        console.error(`[CRON] E-Mail Fehler beim Senden:`, emailError);
+        emailResult = {
+          success: false,
+          message: emailError instanceof Error ? emailError.message : 'Unbekannter E-Mail-Fehler',
+          filteredCount: 0
+        };
+      }
     } else {
       console.log('[CRON] E-Mail nicht konfiguriert (EMAIL_FROM, EMAIL_TO oder GMAIL_APP_PASSWORD fehlt)');
     }

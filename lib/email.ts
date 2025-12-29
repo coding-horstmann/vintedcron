@@ -14,10 +14,20 @@ interface EmailConfig {
 function createTransporter(config: EmailConfig) {
   return nodemailer.createTransport({
     service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true, // true für Port 465, false für andere Ports
     auth: {
       user: config.from,
       pass: config.gmailAppPassword,
     },
+    connectionTimeout: 10000, // 10 Sekunden
+    greetingTimeout: 10000,
+    socketTimeout: 10000,
+    // Zusätzliche Optionen für bessere Kompatibilität
+    tls: {
+      rejectUnauthorized: false
+    }
   });
 }
 
@@ -138,8 +148,13 @@ export async function sendArbitrageEmail(
   minRoi: number = 150
 ): Promise<{ success: boolean; message: string; filteredCount: number }> {
   try {
+    // Sicherstellen, dass minRoi eine gültige Zahl ist
+    const validMinRoi = isNaN(minRoi) || minRoi <= 0 ? 150 : minRoi;
+    
     // Filtere Deals nach Min-ROI
-    const filteredDeals = deals.filter(deal => deal.roi >= minRoi);
+    const filteredDeals = deals.filter(deal => deal.roi >= validMinRoi);
+    
+    console.log(`[EMAIL] Sende E-Mail mit ${filteredDeals.length} Deals (ROI >= ${validMinRoi}%)`);
     
     // Wenn keine Deals den Filter erfüllen, trotzdem E-Mail senden (mit Info)
     const transporter = createTransporter(config);
@@ -149,12 +164,18 @@ export async function sendArbitrageEmail(
       from: `VintedHunter <${config.from}>`,
       to: config.to,
       subject: filteredDeals.length > 0 
-        ? `🎯 ${filteredDeals.length} Arbitrage-Deals gefunden (ROI ≥${minRoi}%)` 
-        : `📊 VintedHunter Scan: Keine Deals mit ROI ≥${minRoi}%`,
+        ? `🎯 ${filteredDeals.length} Arbitrage-Deals gefunden (ROI ≥${validMinRoi}%)` 
+        : `📊 VintedHunter Scan: Keine Deals mit ROI ≥${validMinRoi}%`,
       html: generateEmailHTML(filteredDeals, scanTime),
     };
 
-    await transporter.sendMail(mailOptions);
+    // E-Mail mit Timeout senden
+    await Promise.race([
+      transporter.sendMail(mailOptions),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('E-Mail Timeout nach 15 Sekunden')), 15000)
+      )
+    ]);
     
     return {
       success: true,
