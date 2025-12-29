@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { scrapeVintedCatalogUrl } from '@/lib/scrapers';
 import { searchEbayByTitle, getEbaySearchUrl } from '@/lib/ebay-api';
+import { sendArbitrageEmail } from '@/lib/email';
 import { ArbitrageDeal } from '@/types';
 import vintedUrls from '@/config/vinted-urls.json';
 
@@ -209,13 +210,54 @@ export async function GET(request: Request) {
     }
 
     const elapsedTime = Date.now() - startTime;
-    console.log(`Gefunden: ${deals.length} Arbitrage-Möglichkeiten (Zeit: ${Math.round(elapsedTime/1000)}s)`);
+    console.log(`[SCAN] Gefunden: ${deals.length} Arbitrage-Möglichkeiten (Zeit: ${Math.round(elapsedTime/1000)}s)`);
     
     // Wenn Timeout nahe war, logge Warnung (Response bleibt Array für Kompatibilität)
     if (elapsedTime > MAX_EXECUTION_TIME_MS * 0.9) {
-      console.warn('Scan wurde aufgrund von Timeout-Beschränkungen vorzeitig beendet. Einige Items wurden möglicherweise nicht verarbeitet.');
+      console.warn('[SCAN] Scan wurde aufgrund von Timeout-Beschränkungen vorzeitig beendet. Einige Items wurden möglicherweise nicht verarbeitet.');
+    }
+
+    // E-Mail senden wenn konfiguriert (eine E-Mail pro Scan)
+    let emailResult = { success: false, message: 'E-Mail nicht konfiguriert', filteredCount: 0 };
+    
+    // E-Mail Konfiguration
+    const resendApiKey = process.env.RESEND_API_KEY || '';
+    const emailConfig = {
+      from: process.env.EMAIL_FROM || '',
+      to: process.env.EMAIL_TO || '',
+      gmailAppPassword: process.env.GMAIL_APP_PASSWORD || ''
+    };
+
+    // Min. ROI für E-Mail-Benachrichtigung (mit Fallback)
+    const minRoiEnv = process.env.MIN_ROI_EMAIL;
+    const minRoiForEmail = minRoiEnv && !isNaN(Number(minRoiEnv)) 
+      ? parseInt(minRoiEnv, 10) 
+      : 150;
+
+    const canSendWithResend = resendApiKey && emailConfig.to;
+    const canSendWithGmail = emailConfig.from && emailConfig.to && emailConfig.gmailAppPassword;
+    
+    if (canSendWithResend || canSendWithGmail) {
+      const method = canSendWithResend ? 'Resend API' : 'Gmail SMTP';
+      console.log(`[SCAN] Sende E-Mail via ${method} an "${emailConfig.to}" (Min. ROI: ${minRoiForEmail}%)...`);
+      
+      try {
+        emailResult = await sendArbitrageEmail(deals, emailConfig, minRoiForEmail);
+        console.log(`[SCAN] E-Mail: ${emailResult.message} (${emailResult.filteredCount} Deals mit ROI >= ${minRoiForEmail}%)`);
+      } catch (emailError) {
+        console.error(`[SCAN] E-Mail Fehler beim Senden:`, emailError);
+        emailResult = {
+          success: false,
+          message: emailError instanceof Error ? emailError.message : 'Unbekannter E-Mail-Fehler',
+          filteredCount: 0
+        };
+      }
+    } else {
+      console.log('[SCAN] E-Mail nicht konfiguriert. Setze RESEND_API_KEY + EMAIL_TO (empfohlen) oder EMAIL_FROM + EMAIL_TO + GMAIL_APP_PASSWORD');
     }
     
+    // Response mit Deals und optional E-Mail-Status (für Kompatibilität bleibt es ein Array)
+    // Frontend kann emailResult ignorieren, wenn es nur die Deals braucht
     return NextResponse.json(deals);
     
   } catch (error) {
