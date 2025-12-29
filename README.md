@@ -104,6 +104,22 @@ Bearbeite `config/vinted-urls.json` um URLs hinzuzufügen oder zu entfernen:
 - Rate Limiting ist wichtig um nicht gesperrt zu werden
 - Timeout-Handling: Scan bricht automatisch bei 250s ab und gibt bisherige Ergebnisse zurück
 
+## Deployment auf Railway
+
+1. Push zu GitHub
+2. Verbinde Repository mit Railway
+3. Setze Umgebungsvariablen in Railway Dashboard
+4. Stelle sicher, dass der Service als "Public" markiert ist
+5. **Domain finden/erstellen:**
+   - Gehe zu Service → Settings → Networking
+   - Falls keine Domain angezeigt wird, klicke auf "Generate Domain" oder "Create Public Domain"
+   - Die Domain sollte das Format haben: `vintedcron-production-xxxx.up.railway.app`
+
+**Wichtig für Railway:**
+- Der Service muss als "Public" markiert sein, damit eine Domain generiert wird
+- Der Server läuft automatisch auf dem PORT, den Railway setzt (normalerweise 8080)
+- Railway unterstützt mehrere Services mit eigenen Domains pro Projekt
+
 ## Bot-Schutz
 
 Die App verwendet verschiedene Strategien um Bot-Erkennung zu vermeiden:
