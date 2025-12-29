@@ -44,6 +44,8 @@ export async function GET(request: Request) {
     console.log(`[CRON] eBay API Config: ClientID=${ebayConfig.clientId ? 'gesetzt' : 'FEHLT'}, ClientSecret=${ebayConfig.clientSecret ? `gesetzt (${secretSource})` : 'FEHLT'}`);
 
     // E-Mail Konfiguration
+    // Resend API (empfohlen für Cloud-Hosting) oder Gmail SMTP (Fallback)
+    const resendApiKey = process.env.RESEND_API_KEY || '';
     const emailConfig = {
       from: process.env.EMAIL_FROM || '',
       to: process.env.EMAIL_TO || '',
@@ -51,7 +53,8 @@ export async function GET(request: Request) {
     };
 
     // Debug: Log E-Mail Config Status
-    console.log(`[CRON] E-Mail Config: FROM=${emailConfig.from ? 'gesetzt' : 'FEHLT'}, TO=${emailConfig.to ? 'gesetzt' : 'FEHLT'}, PASSWORD=${emailConfig.gmailAppPassword ? 'gesetzt' : 'FEHLT'}`);
+    const emailMethod = resendApiKey ? 'Resend API' : (emailConfig.gmailAppPassword ? 'Gmail SMTP' : 'NICHT KONFIGURIERT');
+    console.log(`[CRON] E-Mail Config: Methode=${emailMethod}, TO=${emailConfig.to ? 'gesetzt' : 'FEHLT'}`);
 
     // Min. ROI für E-Mail-Benachrichtigung (mit Fallback)
     const minRoiEnv = process.env.MIN_ROI_EMAIL;
@@ -197,11 +200,15 @@ export async function GET(request: Request) {
     console.log(`[CRON] Scan abgeschlossen: ${deals.length} Deals in ${Math.round(elapsedTime / 1000)}s`);
 
     // E-Mail senden wenn konfiguriert
+    // Prüft ob Resend API Key ODER Gmail Credentials vorhanden sind
     let emailResult = { success: false, message: 'E-Mail nicht konfiguriert', filteredCount: 0 };
     
-    if (emailConfig.from && emailConfig.to && emailConfig.gmailAppPassword) {
-      console.log(`[CRON] Sende E-Mail von "${emailConfig.from}" an "${emailConfig.to}" (Min. ROI: ${minRoiForEmail}%)...`);
-      console.log(`[CRON] E-Mail Config Details: FROM="${emailConfig.from}", TO="${emailConfig.to}", PASSWORD_LENGTH=${emailConfig.gmailAppPassword.length}`);
+    const canSendWithResend = resendApiKey && emailConfig.to;
+    const canSendWithGmail = emailConfig.from && emailConfig.to && emailConfig.gmailAppPassword;
+    
+    if (canSendWithResend || canSendWithGmail) {
+      const method = canSendWithResend ? 'Resend API' : 'Gmail SMTP';
+      console.log(`[CRON] Sende E-Mail via ${method} an "${emailConfig.to}" (Min. ROI: ${minRoiForEmail}%)...`);
       
       try {
         emailResult = await sendArbitrageEmail(deals, emailConfig, minRoiForEmail);
@@ -215,7 +222,7 @@ export async function GET(request: Request) {
         };
       }
     } else {
-      console.log('[CRON] E-Mail nicht konfiguriert (EMAIL_FROM, EMAIL_TO oder GMAIL_APP_PASSWORD fehlt)');
+      console.log('[CRON] E-Mail nicht konfiguriert. Setze RESEND_API_KEY + EMAIL_TO (empfohlen) oder EMAIL_FROM + EMAIL_TO + GMAIL_APP_PASSWORD');
     }
 
     // Ergebnis zurückgeben
