@@ -178,6 +178,9 @@ async function searchWithBrowseAPI(
     // Filter für Buying Options und Condition zusammenstellen
     const filters: string[] = ['buyingOptions:{FIXED_PRICE}'];
     
+    // Versand aus Deutschland hinzufügen (nur deutsche Verkäufer)
+    filters.push('deliveryCountry:DE');
+    
     // Condition Filter hinzufügen
     if (ebayCondition === 'NEW') {
       filters.push('conditions:{NEW}');
@@ -185,10 +188,14 @@ async function searchWithBrowseAPI(
       filters.push('conditions:{USED}');
     }
 
+    // Titel für Suche verwenden (encodeURIComponent wird von axios automatisch angewendet)
+    // Aber stellen wir sicher, dass Umlaute korrekt behandelt werden
+    const searchQuery = title.trim();
+
     // eBay Browse API Endpoint
     const response = await axios.get('https://api.ebay.com/buy/browse/v1/item_summary/search', {
       params: {
-        q: title,
+        q: searchQuery, // axios kodiert automatisch korrekt (inkl. Umlaute)
         sort: 'price', // Niedrigster Preis zuerst
         limit: '1', // Nur 1 Ergebnis (günstigstes)
         filter: filters.join(',')
@@ -264,8 +271,10 @@ async function searchWithBrowseAPI(
 export const getEbaySearchUrl = (title: string, condition: string): string => {
   const ebayCondition = mapConditionToEbay(condition);
   const conditionParam = ebayCondition === 'NEW' ? '&LH_ItemCondition=1000' : '&LH_ItemCondition=3000';
-  // OHNE LH_Sold=1 für aktive Angebote
-  return `https://www.ebay.de/sch/i.html?_nkw=${encodeURIComponent(title)}&LH_Complete=1${conditionParam}`;
+  // LH_LocatedIn=1 = Versand aus Deutschland (nur deutsche Verkäufer)
+  // encodeURIComponent kodiert Umlaute (ä, ü, ö) korrekt
+  const encodedTitle = encodeURIComponent(title.trim());
+  return `https://www.ebay.de/sch/i.html?_nkw=${encodedTitle}&LH_Complete=1&LH_LocatedIn=1${conditionParam}`;
 };
 
 /**
@@ -275,6 +284,8 @@ export const getEbaySearchUrl = (title: string, condition: string): string => {
  */
 export const getEbayResearchUrl = (title: string, condition: string): string => {
   // eBay Research-Seite verwendet 'keywords' (plural) als Parameter
-  return `https://www.ebay.de/sh/research?marketplace=EBAY-DE&tabName=SOLD&keywords=${encodeURIComponent(title)}`;
+  // encodeURIComponent kodiert Umlaute (ä, ü, ö) korrekt
+  const encodedTitle = encodeURIComponent(title.trim());
+  return `https://www.ebay.de/sh/research?marketplace=EBAY-DE&tabName=SOLD&keywords=${encodedTitle}`;
 };
 

@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import type { ArbitrageDeal } from '@/types';
 import { getEbayResearchUrl } from '@/lib/ebay-api';
+import { getAmazonSearchUrl } from '@/lib/amazon-api';
 
 interface EmailConfig {
   from: string;
@@ -69,7 +70,8 @@ function generateEmailHTML(deals: ArbitrageDeal[], scanTime: Date, minRoi: numbe
       <td style="padding: 12px; text-align: center;">
         <a href="${deal.vinted.url}" style="color: #3b82f6; text-decoration: none; margin-right: 8px;">Vinted</a>
         <a href="${deal.ebay.url}" style="color: #8b5cf6; text-decoration: none; margin-right: 8px;">eBay</a>
-        <a href="${getEbayResearchUrl(deal.vinted.title, deal.vinted.condition)}" style="color: #ec4899; text-decoration: none;">Research</a>
+        <a href="${getEbayResearchUrl(deal.vinted.title, deal.vinted.condition)}" style="color: #ec4899; text-decoration: none; margin-right: 8px;">eBay Research</a>
+        <a href="${getAmazonSearchUrl(deal.vinted.title)}" style="color: #ff9900; text-decoration: none;">Amazon Link</a>
       </td>
     </tr>
   `).join('');

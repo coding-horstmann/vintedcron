@@ -4,6 +4,7 @@ import { ArbitrageDeal } from '@/types';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Button } from './ui/Button';
 import { getEbayResearchUrl } from '@/lib/ebay-api';
+import { getAmazonSearchUrl } from '@/lib/amazon-api';
 
 interface ResultsTableProps {
   deals: ArbitrageDeal[];
@@ -159,7 +160,16 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({ deals }) => {
                           onClick={() => window.open(getEbayResearchUrl(deal.vinted.title, deal.vinted.condition), '_blank')}
                           title="eBay Research - Verkaufte Artikel analysieren"
                         >
-                         Research <BarChart3 className="ml-1 h-3 w-3" />
+                         eBay Research <BarChart3 className="ml-1 h-3 w-3" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="h-8 px-2 text-xs border-orange-500/30 text-orange-400 hover:bg-orange-500/10" 
+                          onClick={() => window.open(getAmazonSearchUrl(deal.vinted.title), '_blank')}
+                          title="Amazon Link - Aktuelle Angebote bei Amazon finden"
+                        >
+                         Amazon Link <ExternalLink className="ml-1 h-3 w-3" />
                         </Button>
                     </div>
                     </td>
