@@ -10,6 +10,7 @@ import vintedUrls from '@/config/vinted-urls.json';
 export async function GET(request: Request) {
   try {
     const deals: ArbitrageDeal[] = [];
+    const categoryStats: Array<{ name: string; category: string; pagesScraped: number; itemsFound: number }> = [];
     
     // eBay API Konfiguration aus Umgebungsvariablen (OAuth2)
     // Unterstützt sowohl EBAY_CLIENT_SECRET als auch EBAY_CERT_ID (für Kompatibilität)
@@ -64,9 +65,19 @@ export async function GET(request: Request) {
         console.log(`Scraping Vinted: ${urlConfig.name}... (max ${maxPages} Seiten)`);
         
         // Vinted Katalog scrappen mit konfiguriertem Seitenlimit und Sprache-Filter
-        const vintedItems = await scrapeVintedCatalogUrl(urlConfig.url, maxPages, languageFilter);
+        const scrapeResult = await scrapeVintedCatalogUrl(urlConfig.url, maxPages, languageFilter);
+        const vintedItems = scrapeResult.items;
+        const pagesScraped = scrapeResult.pagesScraped;
         
-        console.log(`Gefunden: ${vintedItems.length} Artikel auf Vinted`);
+        console.log(`Gefunden: ${vintedItems.length} Artikel auf Vinted (${pagesScraped} Seiten)`);
+        
+        // Statistik für diese Kategorie speichern
+        categoryStats.push({
+          name: urlConfig.name,
+          category: urlConfig.category || 'Unbekannt',
+          pagesScraped: pagesScraped,
+          itemsFound: vintedItems.length
+        });
         
         // Item-Limit anwenden falls gesetzt
         const itemsToProcess = maxItemsPerScan > 0 
@@ -204,6 +215,13 @@ export async function GET(request: Request) {
         }
       } catch (urlError) {
         console.error(`Fehler beim Scrapen von ${urlConfig.name}:`, urlError);
+        // Auch bei Fehler Statistik hinzufügen
+        categoryStats.push({
+          name: urlConfig.name,
+          category: urlConfig.category || 'Unbekannt',
+          pagesScraped: 0,
+          itemsFound: 0
+        });
         // Weiter mit nächster URL
         continue;
       }
@@ -242,7 +260,7 @@ export async function GET(request: Request) {
       console.log(`[SCAN] Sende E-Mail via ${method} an "${emailConfig.to}" (Min. ROI: ${minRoiForEmail}%)...`);
       
       try {
-        emailResult = await sendArbitrageEmail(deals, emailConfig, minRoiForEmail);
+        emailResult = await sendArbitrageEmail(deals, emailConfig, minRoiForEmail, categoryStats);
         console.log(`[SCAN] E-Mail: ${emailResult.message} (${emailResult.filteredCount} Deals mit ROI >= ${minRoiForEmail}%)`);
       } catch (emailError) {
         console.error(`[SCAN] E-Mail Fehler beim Senden:`, emailError);

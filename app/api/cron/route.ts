@@ -82,6 +82,8 @@ export async function GET(request: Request) {
 
     console.log(`[CRON] Scanne ${enabledUrls.length} Kategorien mit je ${maxPages} Seiten`);
 
+    const categoryStats: Array<{ name: string; category: string; pagesScraped: number; itemsFound: number }> = [];
+
     // Für jede konfigurierte URL
     for (const urlConfig of enabledUrls) {
       try {
@@ -91,9 +93,19 @@ export async function GET(request: Request) {
         // Sprachfilter kann über Umgebungsvariable deaktiviert werden (VINTED_LANGUAGE_FILTER=)
         const languageFilter = process.env.VINTED_LANGUAGE_FILTER || 'Deutsch';
         console.log(`[CRON] Verwende Sprachfilter: ${languageFilter === '' ? 'KEIN FILTER' : languageFilter}`);
-        const vintedItems = await scrapeVintedCatalogUrl(urlConfig.url, maxPages, languageFilter || undefined);
+        const scrapeResult = await scrapeVintedCatalogUrl(urlConfig.url, maxPages, languageFilter || undefined);
+        const vintedItems = scrapeResult.items;
+        const pagesScraped = scrapeResult.pagesScraped;
         
-        console.log(`[CRON] ${urlConfig.name}: ${vintedItems.length} Artikel gefunden`);
+        console.log(`[CRON] ${urlConfig.name}: ${vintedItems.length} Artikel gefunden auf ${pagesScraped} Seiten`);
+        
+        // Statistik für diese Kategorie speichern
+        categoryStats.push({
+          name: urlConfig.name,
+          category: urlConfig.category || 'Unbekannt',
+          pagesScraped: pagesScraped,
+          itemsFound: vintedItems.length
+        });
         
         // eBay API Delay
         const ebayApiDelay = parseInt(process.env.EBAY_API_DELAY_MS || '2000', 10);
@@ -192,6 +204,13 @@ export async function GET(request: Request) {
         }
       } catch (urlError) {
         console.error(`[CRON] Fehler bei ${urlConfig.name}:`, urlError);
+        // Auch bei Fehler Statistik hinzufügen (mit 0 Seiten)
+        categoryStats.push({
+          name: urlConfig.name,
+          category: urlConfig.category || 'Unbekannt',
+          pagesScraped: 0,
+          itemsFound: 0
+        });
         continue;
       }
     }
@@ -211,7 +230,7 @@ export async function GET(request: Request) {
       console.log(`[CRON] Sende E-Mail via ${method} an "${emailConfig.to}" (Min. ROI: ${minRoiForEmail}%)...`);
       
       try {
-        emailResult = await sendArbitrageEmail(deals, emailConfig, minRoiForEmail);
+        emailResult = await sendArbitrageEmail(deals, emailConfig, minRoiForEmail, categoryStats);
         console.log(`[CRON] E-Mail: ${emailResult.message} (${emailResult.filteredCount} Deals mit ROI >= ${minRoiForEmail}%)`);
       } catch (emailError) {
         console.error(`[CRON] E-Mail Fehler beim Senden:`, emailError);

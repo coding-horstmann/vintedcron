@@ -621,7 +621,7 @@ export const scrapeVintedCatalogUrl = async (catalogUrl: string, maxPages: numbe
     }
 
     console.log(`Scraped ${allItems.length} total items from ${pageCount} pages`);
-    return allItems;
+    return { items: allItems, pagesScraped: pageCount };
   } catch (error) {
     console.error("Vinted Catalog Scrape Error:", error);
     throw new Error(`Failed to scrape Vinted catalog: ${error instanceof Error ? error.message : 'Unknown error'}`);

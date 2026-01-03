@@ -8,6 +8,13 @@ interface EmailConfig {
   gmailAppPassword: string;
 }
 
+interface CategoryStat {
+  name: string;
+  category: string;
+  pagesScraped: number;
+  itemsFound: number;
+}
+
 /**
  * Bereinigt E-Mail-Adresse von ungültigen Zeichen
  */
@@ -33,7 +40,7 @@ function formatCurrency(amount: number): string {
  * Generiert HTML für die E-Mail mit Arbitrage-Deals
  * Deals werden nach ROI sortiert (höchster ROI zuerst)
  */
-function generateEmailHTML(deals: ArbitrageDeal[], scanTime: Date, minRoi: number): string {
+function generateEmailHTML(deals: ArbitrageDeal[], scanTime: Date, minRoi: number, categoryStats?: CategoryStat[]): string {
   // Sortiere Deals nach ROI (absteigend - höchster ROI zuerst)
   const sortedDeals = [...deals].sort((a, b) => b.roi - a.roi);
   
@@ -59,6 +66,38 @@ function generateEmailHTML(deals: ArbitrageDeal[], scanTime: Date, minRoi: numbe
       </td>
     </tr>
   `).join('');
+
+  // Kategorie-Statistiken HTML generieren
+  let categoryStatsHtml = '';
+  if (categoryStats && categoryStats.length > 0) {
+    const statsRows = categoryStats.map(stat => `
+      <tr style="border-bottom: 1px solid #e5e7eb;">
+        <td style="padding: 12px; color: #1f2937; font-weight: 500;">${stat.name}</td>
+        <td style="padding: 12px; color: #6b7280; font-size: 14px;">${stat.category}</td>
+        <td style="padding: 12px; text-align: center; color: #3b82f6; font-weight: 600;">${stat.pagesScraped}</td>
+        <td style="padding: 12px; text-align: center; color: #10b981; font-weight: 600;">${stat.itemsFound}</td>
+      </tr>
+    `).join('');
+    
+    categoryStatsHtml = `
+      <div style="padding: 24px; background-color: #f9fafb; border-top: 1px solid #e5e7eb;">
+        <h2 style="color: #1f2937; font-size: 18px; font-weight: 600; margin: 0 0 16px 0;">📊 Scan-Statistiken</h2>
+        <table style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr style="background-color: white; border-bottom: 2px solid #e5e7eb;">
+              <th style="padding: 12px; text-align: left; color: #6b7280; font-weight: 600; font-size: 12px; text-transform: uppercase;">Kategorie</th>
+              <th style="padding: 12px; text-align: left; color: #6b7280; font-weight: 600; font-size: 12px; text-transform: uppercase;">Typ</th>
+              <th style="padding: 12px; text-align: center; color: #6b7280; font-weight: 600; font-size: 12px; text-transform: uppercase;">Seiten</th>
+              <th style="padding: 12px; text-align: center; color: #6b7280; font-weight: 600; font-size: 12px; text-transform: uppercase;">Artikel</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${statsRows}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
 
   return `
     <!DOCTYPE html>
@@ -89,6 +128,8 @@ function generateEmailHTML(deals: ArbitrageDeal[], scanTime: Date, minRoi: numbe
             <div style="font-size: 12px; color: #6b7280;">Min. ROI</div>
           </div>
         </div>
+
+        ${categoryStatsHtml}
 
         <!-- Deals Table -->
         <div style="padding: 24px;">
@@ -213,7 +254,8 @@ async function sendViaGmail(
 export async function sendArbitrageEmail(
   deals: ArbitrageDeal[],
   config: EmailConfig,
-  minRoi: number = 150
+  minRoi: number = 150,
+  categoryStats?: CategoryStat[]
 ): Promise<{ success: boolean; message: string; filteredCount: number }> {
   try {
     // Sicherstellen, dass minRoi eine gültige Zahl ist
@@ -235,7 +277,7 @@ export async function sendArbitrageEmail(
     const subject = filteredDeals.length > 0 
       ? `🎯 ${filteredDeals.length} Arbitrage-Deals gefunden (ROI ≥${validMinRoi}%)` 
       : `📊 VintedCron Scan: Keine Deals mit ROI ≥${validMinRoi}%`;
-    const html = generateEmailHTML(filteredDeals, scanTime, validMinRoi);
+    const html = generateEmailHTML(filteredDeals, scanTime, validMinRoi, categoryStats);
 
     // Prüfe ob Resend API Key vorhanden
     const resendApiKey = process.env.RESEND_API_KEY;
