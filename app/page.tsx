@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/Button';
-import { Search, ArrowRight, DollarSign, Package, TrendingUp, AlertCircle, Info, Server, Sparkles } from 'lucide-react';
+import { Search, ArrowRight, DollarSign, Package, TrendingUp, AlertCircle, Info, Server, Sparkles, Square } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { scanDeals } from '@/lib/scanner';
 import { ResultsTable } from '@/components/ResultsTable';
@@ -41,6 +41,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [useAI, setUseAI] = useState(false);
   const [categories, setCategories] = useState<VintedUrl[]>([]);
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
   
   const totalPotentialProfit = deals.reduce((acc, deal) => acc + (deal.profitAfterFees > 0 ? deal.profitAfterFees : 0), 0);
   const avgRoi = deals.length > 0 ? deals.reduce((acc, deal) => acc + deal.roi, 0) / deals.length : 0;
@@ -79,21 +80,39 @@ export default function Home() {
   }, []);
 
   const handleStartScan = async (categoryId?: string) => {
+    // Erstelle neuen AbortController für diesen Scan
+    const controller = new AbortController();
+    setAbortController(controller);
     setIsSearching(true);
     setScanningCategory(categoryId || null);
     setError(null);
     try {
-      const foundDeals = await scanDeals(useAI, categoryId);
+      const foundDeals = await scanDeals(useAI, categoryId, controller);
       setDeals(foundDeals);
       if (foundDeals.length === 0 && !useAI) {
         setError("Keine Deals gefunden. Versuche KI-Fallback zu aktivieren.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setError("Scan error. Please try again.");
+      if (err.message === 'Scan wurde abgebrochen') {
+        setError("Scan wurde abgebrochen.");
+      } else {
+        setError("Scan error. Please try again.");
+      }
     } finally {
       setIsSearching(false);
       setScanningCategory(null);
+      setAbortController(null);
+    }
+  };
+
+  const handleStopScan = () => {
+    if (abortController) {
+      abortController.abort();
+      setAbortController(null);
+      setIsSearching(false);
+      setScanningCategory(null);
+      setError("Scan wurde gestoppt.");
     }
   };
 
@@ -123,14 +142,21 @@ export default function Home() {
              <Server className="mr-2 h-4 w-4" />
              Scraper Status
            </Button>
-           <Button onClick={handleStartScanAll} isLoading={isSearching} className="shadow-lg shadow-blue-500/20">
-             {isSearching ? 'Scanning Markets...' : (
-               <>
-                <Search className="mr-2 h-4 w-4" />
-                Start Scan
-               </>
-             )}
-           </Button>
+           {isSearching ? (
+             <Button 
+               onClick={handleStopScan} 
+               variant="outline"
+               className="shadow-lg shadow-red-500/20 border-red-500/50 hover:bg-red-500/10"
+             >
+               <Square className="mr-2 h-4 w-4" />
+               Stop Scan
+             </Button>
+           ) : (
+             <Button onClick={handleStartScanAll} className="shadow-lg shadow-blue-500/20">
+               <Search className="mr-2 h-4 w-4" />
+               Start Scan
+             </Button>
+           )}
         </div>
       </div>
 

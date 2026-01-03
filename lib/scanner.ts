@@ -14,7 +14,14 @@ import { ArbitrageDeal } from '@/types';
  * @param useAI - Wenn true, wird bei API-Fehler Gemini AI verwendet. Wenn false, wird leeres Array zurückgegeben.
  * @param specificUrlId - Optional: ID einer spezifischen URL aus vinted-urls.json, um nur diese zu scannen
  */
-export const scanDeals = async (useAI: boolean = false, specificUrlId?: string): Promise<ArbitrageDeal[]> => {
+// Exportiere AbortController-Typ für externe Verwendung
+export type ScanAbortController = AbortController;
+
+export const scanDeals = async (
+  useAI: boolean = false, 
+  specificUrlId?: string,
+  abortController?: AbortController
+): Promise<ArbitrageDeal[]> => {
   
   // --- STRATEGY 1: REAL SERVER SCRAPING ---
   try {
@@ -39,8 +46,8 @@ export const scanDeals = async (useAI: boolean = false, specificUrlId?: string):
       }
     }
     
-    // We set a longer timeout for full scans (can take several minutes, besonders bei mehreren Kategorien)
-    const controller = new AbortController();
+    // Verwende übergebenen AbortController oder erstelle neuen
+    const controller = abortController || new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 1800000); // 30 Minuten timeout für vollständige Scans (ausreichend für 2-3 Kategorien)
 
     // Sprache-Einstellung aus localStorage laden
@@ -82,7 +89,12 @@ export const scanDeals = async (useAI: boolean = false, specificUrlId?: string):
       const errorData = await response.json().catch(() => ({}));
       console.warn("Client: /api/scan endpoint error. Status:", response.status, errorData);
     }
-  } catch (e) {
+  } catch (e: any) {
+    // Prüfe ob Request abgebrochen wurde
+    if (e.name === 'AbortError' || e.message?.includes('aborted')) {
+      console.log("Client: Scan wurde abgebrochen");
+      throw new Error('Scan wurde abgebrochen');
+    }
     console.warn("Client: Could not reach backend API:", e);
   }
 
