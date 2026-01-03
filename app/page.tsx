@@ -142,12 +142,12 @@ export default function Home() {
             <div>
               <h3 className="font-medium text-white mb-1">Architecture Status</h3>
               <p className="text-sm text-slate-400 mb-2">
-                <strong>Current Environment:</strong> Vercel (Server-Side)
+                <strong>Current Environment:</strong> Railway (Server-Side)
               </p>
               <div className="grid md:grid-cols-2 gap-4 mt-2">
                  <div className="bg-slate-950 p-3 rounded border border-slate-800">
                     <div className="text-xs font-mono text-emerald-400 mb-1">STRATEGY 1: Server API</div>
-                    <p className="text-xs text-slate-400">Calls <code>/api/scan</code>. Performs <strong>Real Scraping</strong> (Axios/Cheerio) on Vercel servers. Uses Vercel server IP addresses.</p>
+                    <p className="text-xs text-slate-400">Calls <code>/api/scan</code>. Performs <strong>Real Scraping</strong> (Axios/Cheerio) on Railway servers. Uses Railway server IP addresses.</p>
                  </div>
                  <div className="bg-slate-950 p-3 rounded border border-slate-800">
                     <div className="text-xs font-mono text-blue-400 mb-1">STRATEGY 2: AI Fallback</div>

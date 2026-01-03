@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Settings, Menu, X, FileBarChart } from 'lucide-react';
+import { LayoutDashboard, Settings, Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface LayoutProps {
@@ -31,7 +31,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const menuItems = [
     { icon: LayoutDashboard, label: "Dashboard", href: "/" },
-    { icon: FileBarChart, label: "Ergebnisse", href: "/results" },
     { icon: Settings, label: "Settings", href: "/settings" },
   ];
 
