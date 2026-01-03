@@ -2,25 +2,13 @@
   <!-- Background with gradient -->
   <rect width="64" height="64" rx="12" fill="url(#gradient)"/>
   
-  <!-- Clock/Cron symbol (outer circle) -->
-  <circle cx="32" cy="32" r="20" stroke="white" stroke-width="2" opacity="0.3"/>
+  <!-- Target circles -->
+  <circle cx="32" cy="32" r="22" stroke="white" stroke-width="2" opacity="0.3"/>
+  <circle cx="32" cy="32" r="16" stroke="white" stroke-width="2" opacity="0.5"/>
+  <circle cx="32" cy="32" r="10" stroke="white" stroke-width="2" opacity="0.7"/>
   
-  <!-- Clock hands pointing to 2 (for "2 hours" cron) -->
-  <line x1="32" y1="32" x2="32" y2="20" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity="0.9"/>
-  <line x1="32" y1="32" x2="38" y2="26" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
-  
-  <!-- Arbitrage arrows - two arrows crossing (Vinted ↔ eBay) -->
-  <!-- Left arrow (Vinted) -->
-  <path d="M12 32 L20 28 L20 30 L24 30 L24 34 L20 34 L20 36 Z" fill="white" opacity="0.9"/>
-  
-  <!-- Right arrow (eBay) -->
-  <path d="M52 32 L44 28 L44 30 L40 30 L40 34 L44 34 L44 36 Z" fill="white" opacity="0.9"/>
-  
-  <!-- Center connection point -->
-  <circle cx="32" cy="32" r="3" fill="white" opacity="0.9"/>
-  
-  <!-- Profit indicator (upward trend) -->
-  <path d="M26 40 L30 36 L32 38 L34 36 L38 40" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Center dot -->
+  <circle cx="32" cy="32" r="4" fill="white" opacity="0.9"/>
   
   <defs>
     <linearGradient id="gradient" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
