@@ -101,14 +101,14 @@ export async function GET(request: Request) {
     }
     
     // Timeout-Handling: Railway hat ein Timeout von ~10 Minuten für HTTP-Requests
-    // Wir setzen ein Limit von 9 Minuten, um sicher unter dem Railway-Limit zu bleiben
-    // Mit 2 Kategorien à 250 Items und 1.5s Delay = ~12.5 Min (überschreitet Limit)
-    // Daher: Intelligenter Timeout-Check während des Scans stoppt rechtzeitig
-    const startTime = Date.now();
-    const MAX_EXECUTION_TIME_MS = 540000; // 9 Minuten (540 Sekunden) - sicher unter Railway-Limit von 10 Min
+    // Wir setzen ein Limit von 9 Minuten PRO KATEGORIE, um sicher unter dem Railway-Limit zu bleiben
+    // Jede Kategorie kann bis zu 9 Minuten haben, damit beide vollständig gescannt werden können
+    const MAX_CATEGORY_TIME_MS = 540000; // 9 Minuten (540 Sekunden) pro Kategorie - sicher unter Railway-Limit von 10 Min
 
     // Für jede konfigurierte URL
     for (const urlConfig of enabledUrls) {
+      // Start-Zeit für diese Kategorie
+      const categoryStartTime = Date.now();
       try {
         console.log(`Scraping Vinted: ${urlConfig.name}... (max ${maxPages} Seiten)`);
         
