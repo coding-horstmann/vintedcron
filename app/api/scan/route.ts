@@ -149,9 +149,9 @@ export async function GET(request: Request) {
         const maxConsecutiveRateLimitErrors = 5; // Nach 5 aufeinanderfolgenden Fehlern überspringe eBay API
         
         for (let i = 0; i < itemsToProcess.length; i++) {
-          // Timeout-Check: Berechne verbleibende Zeit
-          const elapsedTime = Date.now() - startTime;
-          const remainingTime = MAX_EXECUTION_TIME_MS - elapsedTime;
+          // Timeout-Check PRO KATEGORIE: Berechne verbleibende Zeit für diese Kategorie
+          const elapsedTime = Date.now() - categoryStartTime;
+          const remainingTime = MAX_CATEGORY_TIME_MS - elapsedTime;
           
           // Logging alle 10 Items für Debugging
           if (i % 10 === 0 || i === 0) {
@@ -163,9 +163,9 @@ export async function GET(request: Request) {
             console.warn(`[SCAN] Warnung: Nur noch ${Math.round(remainingTime/1000)}s übrig. Verarbeite noch ${Math.min(10, itemsToProcess.length - i)} Items...`);
           }
           
-          // Abbrechen wenn Timeout erreicht (mit Puffer für Response)
+          // Abbrechen wenn Timeout für diese Kategorie erreicht (mit Puffer für Response)
           // Verwende einen größeren Puffer (30 Sekunden), damit mehr Items verarbeitet werden können
-          if (elapsedTime > MAX_EXECUTION_TIME_MS - 30000) { // 30 Sekunden Puffer für Response
+          if (elapsedTime > MAX_CATEGORY_TIME_MS - 30000) { // 30 Sekunden Puffer für Response
             const remainingItems = itemsToProcess.length - i;
             console.warn(`[SCAN] Timeout nahe (${Math.round(elapsedTime/1000)}s). Breche eBay-API-Calls ab. ${remainingItems} Items werden mit Fallback-URLs hinzugefügt.`);
             
@@ -393,13 +393,14 @@ export async function GET(request: Request) {
       }
     }
 
-    const elapsedTime = Date.now() - startTime;
-    console.log(`[SCAN] Gefunden: ${deals.length} Arbitrage-Möglichkeiten (Zeit: ${Math.round(elapsedTime/1000)}s)`);
+    const elapsedTime = Date.now() - overallStartTime;
+    console.log(`[SCAN] Gefunden: ${deals.length} Arbitrage-Möglichkeiten (Gesamt-Zeit: ${Math.round(elapsedTime/1000)}s)`);
     console.log(`[SCAN] eBay-API-Statistiken: ${itemsWithEbayApi} mit eBay-API, ${itemsWithFallbackOnly} nur mit Fallback, ${itemsSkippedDueToTimeout} wegen Timeout übersprungen`);
     
     // Wenn Timeout nahe war, logge Warnung (Response bleibt Array für Kompatibilität)
-    if (elapsedTime > MAX_EXECUTION_TIME_MS * 0.9) {
-      console.warn('[SCAN] Scan wurde aufgrund von Timeout-Beschränkungen vorzeitig beendet. Einige Items wurden möglicherweise nicht verarbeitet.');
+    // Prüfe ob eine Kategorie das Timeout erreicht hat (9 Minuten pro Kategorie)
+    if (itemsSkippedDueToTimeout > 0) {
+      console.warn(`[SCAN] ${itemsSkippedDueToTimeout} Items wurden wegen Timeout-Beschränkungen (9 Min pro Kategorie) nicht vollständig verarbeitet.`);
     }
     
     // eBay-API-Statistiken für E-Mail
