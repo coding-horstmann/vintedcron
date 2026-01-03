@@ -196,6 +196,7 @@ async function searchWithBrowseAPI(
     const response = await axios.get('https://api.ebay.com/buy/browse/v1/item_summary/search', {
       params: {
         q: searchQuery, // axios kodiert automatisch korrekt (inkl. Umlaute)
+        category_ids: '267', // Kategorie-ID 267 = Bücher (übergeordnete Kategorie bei eBay.de)
         sort: 'price', // Niedrigster Preis zuerst
         limit: '1', // Nur 1 Ergebnis (günstigstes)
         filter: filters.join(',')
