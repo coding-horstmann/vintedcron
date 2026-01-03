@@ -71,15 +71,31 @@ export async function GET(request: Request) {
       : 3;
     console.log(`[SCAN] Verwende maxPages: ${maxPages} (Fallback verwendet: ${maxPagesEnv && !isNaN(Number(maxPagesEnv)) && Number(maxPagesEnv) > 0 ? 'NEIN' : 'JA - Umgebungsvariable ungültig oder nicht gesetzt'})`);
     
-    // Item-Limit pro Kategorie (optional, um Timeouts zu vermeiden)
-    // WICHTIG: Railway hat ein Timeout von ~10 Minuten für HTTP-Requests
-    // Berechnung: 2 Kategorien × 288 Items × 2s Delay = ~19 Minuten (überschreitet Railway Limit)
-    // Standard: 0 = kein Limit (scannt alle Items)
-    // Wenn Timeouts auftreten, setze MAX_ITEMS_PER_SCAN auf z.B. 200-250 pro Kategorie
+    // Automatisches Item-Limit pro Kategorie basierend auf Anzahl der Kategorien
+    // Railway hat ein Timeout von ~10 Minuten für HTTP-Requests
+    // Berechnung für optimale Verteilung:
+    // - 1 Kategorie: 300 Items × 2s = 10 Minuten (Maximum)
+    // - 2 Kategorien: 150 Items × 2s × 2 = 10 Minuten (optimal verteilt)
+    // - 3+ Kategorien: 100 Items × 2s × 3 = 10 Minuten
+    const enabledUrlsCount = enabledUrls.length;
+    let maxItemsPerCategory: number;
+    
+    if (enabledUrlsCount === 1) {
+      maxItemsPerCategory = 300; // 1 Kategorie: bis zu 300 Items
+    } else if (enabledUrlsCount === 2) {
+      maxItemsPerCategory = 150; // 2 Kategorien: 150 Items pro Kategorie = 300 total
+    } else {
+      maxItemsPerCategory = 100; // 3+ Kategorien: 100 Items pro Kategorie
+    }
+    
+    // Überschreibe mit Umgebungsvariable falls gesetzt (für manuelle Anpassung)
     const maxItemsPerCategoryEnv = process.env.MAX_ITEMS_PER_SCAN || process.env.MAX_ITEMS_PER_CATEGORY;
-    const maxItemsPerCategory = maxItemsPerCategoryEnv && !isNaN(Number(maxItemsPerCategoryEnv)) 
-      ? parseInt(maxItemsPerCategoryEnv, 10) 
-      : 0; // Standard: 0 = kein Limit (scannt alle Items aus beiden Kategorien)
+    if (maxItemsPerCategoryEnv && !isNaN(Number(maxItemsPerCategoryEnv)) && Number(maxItemsPerCategoryEnv) > 0) {
+      maxItemsPerCategory = parseInt(maxItemsPerCategoryEnv, 10);
+      console.log(`[SCAN] Manuelles Item-Limit aus Umgebungsvariable: ${maxItemsPerCategory} Items pro Kategorie`);
+    } else {
+      console.log(`[SCAN] Automatisches Item-Limit: ${maxItemsPerCategory} Items pro Kategorie (für ${enabledUrlsCount} Kategorie${enabledUrlsCount > 1 ? 'n' : ''})`);
+    }
     
     // Timeout-Handling: Railway hat kein festes Timeout, aber wir setzen ein Limit für Stabilität
     // Erhöht auf 30 Min für Railway, damit mehrere Kategorien verarbeitet werden können
