@@ -193,12 +193,13 @@ async function searchWithBrowseAPI(
     const searchQuery = title.trim();
 
     // eBay Browse API Endpoint
+    // Mehr Ergebnisse abrufen, um nach deutschen Verkäufern filtern zu können
     const response = await axios.get('https://api.ebay.com/buy/browse/v1/item_summary/search', {
       params: {
         q: searchQuery, // axios kodiert automatisch korrekt (inkl. Umlaute)
         category_ids: '267', // Kategorie-ID 267 = Bücher (übergeordnete Kategorie bei eBay.de)
         sort: 'price', // Niedrigster Preis zuerst
-        limit: '1', // Nur 1 Ergebnis (günstigstes)
+        limit: '20', // Mehr Ergebnisse abrufen, um deutsche Verkäufer zu finden
         filter: filters.join(',')
       },
       headers: {
@@ -220,8 +221,26 @@ async function searchWithBrowseAPI(
       return null;
     }
 
-    // Nimm das erste (günstigste) Ergebnis
-    const item = items[0];
+    // Filtere nach deutschen Verkäufern
+    const germanItems = items.filter(item => {
+      const sellerLocation = item.sellerDetail?.location || '';
+      const itemLocation = item.itemLocation?.country || '';
+      
+      // Prüfe ob Standort Deutschland ist
+      const locationLower = sellerLocation.toLowerCase();
+      return locationLower.includes('deutschland') || 
+             locationLower.includes('germany') ||
+             itemLocation === 'DE' ||
+             itemLocation === 'Germany';
+    });
+
+    // Wenn keine deutschen Verkäufer gefunden, gib null zurück
+    if (germanItems.length === 0) {
+      return null;
+    }
+
+    // Nimm das erste (günstigste) deutsche Ergebnis
+    const item = germanItems[0];
     const price = parseFloat(item.price?.value || '0');
     const shipping = parseFloat(item.shippingOptions?.[0]?.shippingCost?.value || '0');
     const totalPrice = price + shipping;
