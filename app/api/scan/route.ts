@@ -72,10 +72,12 @@ export async function GET(request: Request) {
     console.log(`[SCAN] Verwende maxPages: ${maxPages} (Fallback verwendet: ${maxPagesEnv && !isNaN(Number(maxPagesEnv)) && Number(maxPagesEnv) > 0 ? 'NEIN' : 'JA - Umgebungsvariable ungültig oder nicht gesetzt'})`);
     
     // Item-Limit pro Scan (optional, um Timeouts zu vermeiden)
+    // WICHTIG: Railway hat ein Timeout von ~10 Minuten für HTTP-Requests
+    // Empfohlen: 50-100 Items pro Scan, um Timeouts zu vermeiden
     const maxItemsPerScanEnv = process.env.MAX_ITEMS_PER_SCAN;
     const maxItemsPerScan = maxItemsPerScanEnv && !isNaN(Number(maxItemsPerScanEnv)) 
       ? parseInt(maxItemsPerScanEnv, 10) 
-      : 0; // 0 = kein Limit
+      : 50; // Standard: 50 Items (statt 0) um Railway Timeouts zu vermeiden
     
     // Timeout-Handling: Railway hat kein festes Timeout, aber wir setzen ein Limit für Stabilität
     // Erhöht auf 30 Min für Railway, damit mehrere Kategorien verarbeitet werden können
@@ -431,9 +433,22 @@ export async function GET(request: Request) {
     console.error("[SCAN] API Route Error:", error);
     console.error("[SCAN] Error Stack:", error instanceof Error ? error.stack : 'No stack trace');
     console.error("[SCAN] Error Details:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
+    
+    // Prüfe ob es ein Timeout oder Memory-Problem ist
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const isTimeout = errorMessage.includes('timeout') || errorMessage.includes('Killed') || errorMessage.includes('ECONNRESET');
+    
+    if (isTimeout) {
+      console.error("[SCAN] Timeout erkannt! Setze MAX_ITEMS_PER_SCAN auf einen niedrigeren Wert (z.B. 50)");
+    }
+    
     return NextResponse.json({ 
       error: "Failed to scrape", 
-      details: error instanceof Error ? error.message : 'Unknown error'
+      details: errorMessage,
+      suggestion: isTimeout ? "Der Scan wurde wegen Timeout abgebrochen. Setze MAX_ITEMS_PER_SCAN auf 50-100 in den Umgebungsvariablen." : undefined
     }, { status: 500 });
+  } finally {
+    // Stelle sicher, dass der Timeout-Cleanup ausgeführt wird
+    clearTimeout(requestTimeout);
   }
 }
