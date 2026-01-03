@@ -41,7 +41,7 @@ export const scanDeals = async (useAI: boolean = false, specificUrlId?: string):
     
     // We set a longer timeout for full scans (can take several minutes)
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 Minuten timeout für vollständige Scans
+    const timeoutId = setTimeout(() => controller.abort(), 720000); // 12 Minuten timeout für vollständige Scans (gleich wie Backend)
 
     // Sprache-Einstellung aus localStorage laden
     let languageFilter = 'Deutsch'; // Standard

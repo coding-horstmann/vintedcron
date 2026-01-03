@@ -72,9 +72,10 @@ export async function GET(request: Request) {
       : 0; // 0 = kein Limit
     
     // Timeout-Handling: Railway hat kein festes Timeout, aber wir setzen ein Limit für Stabilität
-    // Erhöht auf 600s (10 Min) für Railway, damit mehr Items verarbeitet werden können
+    // Erhöht auf 660s (11 Min) für Railway, damit alle Items verarbeitet werden können
+    // Mit 288 Items und 2s Delay = 576s, plus Puffer = 660s
     const startTime = Date.now();
-    const MAX_EXECUTION_TIME_MS = 600000; // 600 Sekunden (10 Min) - ausreichend für ~300 Items mit 2s Delay
+    const MAX_EXECUTION_TIME_MS = 660000; // 660 Sekunden (11 Min) - ausreichend für ~330 Items mit 2s Delay
 
     // Für jede konfigurierte URL
     for (const urlConfig of enabledUrls) {
@@ -130,7 +131,8 @@ export async function GET(request: Request) {
           }
           
           // Abbrechen wenn Timeout erreicht (mit Puffer für Response)
-          if (elapsedTime > MAX_EXECUTION_TIME_MS - 10000) { // 10 Sekunden Puffer für Response
+          // Verwende einen größeren Puffer (30 Sekunden), damit mehr Items verarbeitet werden können
+          if (elapsedTime > MAX_EXECUTION_TIME_MS - 30000) { // 30 Sekunden Puffer für Response
             const remainingItems = itemsToProcess.length - i;
             console.warn(`[SCAN] Timeout nahe (${Math.round(elapsedTime/1000)}s). Breche eBay-API-Calls ab. ${remainingItems} Items werden mit Fallback-URLs hinzugefügt.`);
             

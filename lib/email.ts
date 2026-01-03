@@ -139,7 +139,7 @@ function generateEmailHTML(deals: ArbitrageDeal[], scanTime: Date, minRoi: numbe
         ${categoryStatsHtml}
 
         <!-- eBay-API-Statistiken -->
-        ${ebayApiStats && (ebayApiStats.itemsSkippedDueToTimeout > 0 || ebayApiStats.itemsWithFallbackOnly > ebayApiStats.itemsWithEbayApi) ? `
+        ${ebayApiStats && ebayApiStats.itemsSkippedDueToTimeout > 0 ? `
           <div style="padding: 24px; background-color: #fef3c7; border-top: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb;">
             <h2 style="color: #92400e; font-size: 18px; font-weight: 600; margin: 0 0 16px 0;">⚠️ eBay-API-Hinweis</h2>
             <div style="color: #78350f; font-size: 14px; line-height: 1.6;">
@@ -160,7 +160,9 @@ function generateEmailHTML(deals: ArbitrageDeal[], scanTime: Date, minRoi: numbe
                 ` : ''}
               </ul>
               <p style="margin: 12px 0 0 0; font-size: 13px; color: #92400e;">
-                <strong>Hinweis:</strong> Items ohne eBay-Preis haben ROI 0% und werden möglicherweise nicht in dieser E-Mail angezeigt. 
+                <strong>Hinweis:</strong> "Fallback-URLs" bedeutet, dass kein Preis bei eBay gefunden wurde (z.B. Artikel nicht verfügbar oder zu selten). 
+                Diese Items haben ROI 0% und werden nicht in dieser E-Mail angezeigt. 
+                Items mit eBay-Preis aber ROI &lt; ${validMinRoi}% werden ebenfalls nicht angezeigt. 
                 Bitte überprüfe die Web-App für eine vollständige Übersicht aller gescannten Items.
               </p>
             </div>
@@ -298,26 +300,21 @@ export async function sendArbitrageEmail(
     // Sicherstellen, dass minRoi eine gültige Zahl ist
     const validMinRoi = isNaN(minRoi) || minRoi <= 0 ? 150 : minRoi;
     
-    // Filtere Deals: Zeige alle Deals mit eBay-Preis > 0 und ROI > 0
+    // Filtere Deals: Zeige NUR Deals mit eBay-Preis > 0 und ROI >= minRoi
     // Sortiere nach ROI (absteigend) für bessere Übersicht
     let filteredDeals = deals
-      .filter(deal => deal.ebay.price > 0 && deal.roi > 0)
+      .filter(deal => deal.ebay.price > 0 && deal.roi >= validMinRoi)
       .sort((a, b) => b.roi - a.roi);
     
-    // Wenn viele Deals vorhanden sind, zeige nur die mit ROI >= minRoi ODER die Top 50
-    if (filteredDeals.length > 50) {
-      const highRoiDeals = filteredDeals.filter(deal => deal.roi >= validMinRoi);
-      if (highRoiDeals.length > 0) {
-        // Zeige nur Deals mit hohem ROI wenn vorhanden
-        filteredDeals = highRoiDeals;
-        console.log(`[EMAIL] ${filteredDeals.length} Deals mit ROI >= ${validMinRoi}% gefunden (von ${deals.length} total)`);
-      } else {
-        // Sonst zeige Top 50 Deals
-        filteredDeals = filteredDeals.slice(0, 50);
-        console.log(`[EMAIL] Keine Deals mit ROI >= ${validMinRoi}% gefunden. Zeige Top 50 Deals (von ${deals.length} total)`);
+    console.log(`[EMAIL] ${filteredDeals.length} Deals mit ROI >= ${validMinRoi}% gefunden (von ${deals.length} total)`);
+    
+    // Wenn keine Deals mit hohem ROI gefunden wurden, zeige Info
+    if (filteredDeals.length === 0) {
+      const dealsWithPrice = deals.filter(deal => deal.ebay.price > 0 && deal.roi > 0);
+      if (dealsWithPrice.length > 0) {
+        const maxRoi = Math.max(...dealsWithPrice.map(d => d.roi));
+        console.log(`[EMAIL] Keine Deals mit ROI >= ${validMinRoi}% gefunden. Höchster ROI: ${maxRoi.toFixed(0)}%`);
       }
-    } else if (filteredDeals.length > 0) {
-      console.log(`[EMAIL] ${filteredDeals.length} Deals mit eBay-Preis gefunden (von ${deals.length} total)`);
     }
     
     // Bereinige E-Mail-Adressen
