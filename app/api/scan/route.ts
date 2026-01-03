@@ -8,6 +8,11 @@ import vintedUrls from '@/config/vinted-urls.json';
 // This function runs on the SERVER (Node.js environment)
 // It bypasses CORS restrictions that exist in the browser.
 export async function GET(request: Request) {
+  // Timeout für gesamten Request (12 Minuten - etwas mehr als MAX_EXECUTION_TIME_MS)
+  const requestTimeout = setTimeout(() => {
+    console.error('[SCAN] KRITISCH: Request-Timeout erreicht! Der Scan läuft zu lange.');
+  }, 720000); // 12 Minuten
+  
   try {
     const deals: ArbitrageDeal[] = [];
     const categoryStats: Array<{ name: string; category: string; pagesScraped: number; itemsFound: number }> = [];
@@ -114,6 +119,11 @@ export async function GET(request: Request) {
           const elapsedTime = Date.now() - startTime;
           const remainingTime = MAX_EXECUTION_TIME_MS - elapsedTime;
           
+          // Logging alle 10 Items für Debugging
+          if (i % 10 === 0 || i === 0) {
+            console.log(`[SCAN] Verarbeite Item ${i + 1}/${itemsToProcess.length} (${Math.round(elapsedTime/1000)}s vergangen, ${Math.round(remainingTime/1000)}s übrig)`);
+          }
+          
           // Warnung wenn weniger als 30 Sekunden übrig sind
           if (remainingTime < 30000 && remainingTime > 0 && i % 10 === 0) {
             console.warn(`[SCAN] Warnung: Nur noch ${Math.round(remainingTime/1000)}s übrig. Verarbeite noch ${Math.min(10, itemsToProcess.length - i)} Items...`);
@@ -184,18 +194,22 @@ export async function GET(request: Request) {
                 const currentDelay = consecutiveRateLimitErrors > 0 
                   ? ebayApiDelay * (consecutiveRateLimitErrors + 1) 
                   : ebayApiDelay;
+                console.log(`[SCAN] Warte ${currentDelay}ms vor eBay-API-Call für Item ${i + 1}...`);
                 await new Promise(resolve => setTimeout(resolve, currentDelay));
               }
               
               try {
+                console.log(`[SCAN] Rufe eBay-API auf für Item ${i + 1}: "${vItem.title.substring(0, 50)}..."`);
                 ebayResult = await searchEbayByTitle(
                   vItem.title,
                   vItem.condition,
                   ebayConfig
                 );
+                console.log(`[SCAN] eBay-API erfolgreich für Item ${i + 1}${ebayResult && ebayResult.price > 0 ? ` (Preis: ${ebayResult.price}€)` : ' (kein Preis gefunden)'}`);
                 // Erfolgreiche Anfrage: Reset Rate-Limit-Fehler-Zähler
                 consecutiveRateLimitErrors = 0;
               } catch (apiError: any) {
+                console.error(`[SCAN] eBay-API-Fehler für Item ${i + 1}:`, apiError.message || apiError);
                 // Prüfe ob es ein Rate-Limit-Fehler ist
                 if (apiError?.message === 'RATE_LIMIT' || apiError?.response?.status === 429) {
                   consecutiveRateLimitErrors++;
@@ -215,6 +229,9 @@ export async function GET(request: Request) {
             
             // Wenn keine eBay API oder kein Ergebnis, Fallback URL generieren
             if (!ebayResult) {
+              if (i % 10 === 0 || i < 3) {
+                console.log(`[SCAN] Verwende Fallback-URL für Item ${i + 1} (kein eBay-API-Ergebnis)`);
+              }
               // Stelle sicher, dass der Titel nicht nur ein Preis ist
               let searchTitle = vItem.title;
               // Wenn Titel nur Preis ist, versuche aus URL zu extrahieren
@@ -281,8 +298,48 @@ export async function GET(request: Request) {
             });
             
             // Rate Limiting wird bereits vor dem API-Call durchgeführt (siehe oben)
-          } catch (itemError) {
-            console.error(`Fehler bei Item "${vItem.title}":`, itemError);
+          } catch (itemError: any) {
+            console.error(`[SCAN] Fehler bei Item ${i + 1} "${vItem?.title || 'unbekannt'}":`, itemError?.message || itemError);
+            // Füge Item trotzdem mit Fallback hinzu
+            try {
+              let searchTitle = vItem?.title || 'Artikel';
+              if (!searchTitle || searchTitle.match(/^[\d,.\s€]+$/)) {
+                const urlMatch = vItem?.url?.match(/\/items\/(\d+)-([^/?]+)/);
+                if (urlMatch && urlMatch[2]) {
+                  searchTitle = decodeURIComponent(urlMatch[2].replace(/-/g, ' '));
+                } else {
+                  searchTitle = 'Artikel';
+                }
+              }
+              
+              const searchUrl = getEbaySearchUrl(searchTitle, vItem?.condition || '');
+              deals.push({
+                id: `deal-${Date.now()}-${deals.length}`,
+                vinted: {
+                  id: `v-${deals.length}`,
+                  title: vItem?.title || 'Unbekannt',
+                  price: vItem?.price || 0,
+                  url: vItem?.url || '',
+                  condition: vItem?.condition || '',
+                  imageUrl: vItem?.imageUrl || 'https://placehold.co/400?text=No+Image',
+                  category: urlConfig.category || 'Unbekannt',
+                  language: vItem?.language
+                },
+                ebay: {
+                  price: 0,
+                  url: searchUrl,
+                  title: searchTitle
+                },
+                profit: 0,
+                profitAfterFees: 0,
+                roi: 0,
+                timestamp: new Date(),
+                status: 'new'
+              });
+              itemsWithFallbackOnly++;
+            } catch (fallbackError) {
+              console.error(`[SCAN] Auch Fallback fehlgeschlagen für Item ${i + 1}:`, fallbackError);
+            }
             // Weiter mit nächstem Item
             continue;
           }
@@ -359,10 +416,13 @@ export async function GET(request: Request) {
     
     // Response mit Deals und optional E-Mail-Status (für Kompatibilität bleibt es ein Array)
     // Frontend kann emailResult ignorieren, wenn es nur die Deals braucht
+    console.log(`[SCAN] Scan abgeschlossen: ${deals.length} Deals gefunden, sende Response...`);
     return NextResponse.json(deals);
     
   } catch (error) {
-    console.error("API Route Error:", error);
+    console.error("[SCAN] API Route Error:", error);
+    console.error("[SCAN] Error Stack:", error instanceof Error ? error.stack : 'No stack trace');
+    console.error("[SCAN] Error Details:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
     return NextResponse.json({ 
       error: "Failed to scrape", 
       details: error instanceof Error ? error.message : 'Unknown error'
