@@ -73,12 +73,13 @@ export async function GET(request: Request) {
     
     // Item-Limit pro Kategorie (optional, um Timeouts zu vermeiden)
     // WICHTIG: Railway hat ein Timeout von ~10 Minuten für HTTP-Requests
-    // Berechnung: 2 Kategorien × 150 Items × 2s Delay = ~10 Minuten (an der Grenze)
-    // Empfohlen: 100-150 Items pro Kategorie für 2 Kategorien
+    // Berechnung: 2 Kategorien × 288 Items × 2s Delay = ~19 Minuten (überschreitet Railway Limit)
+    // Standard: 0 = kein Limit (scannt alle Items)
+    // Wenn Timeouts auftreten, setze MAX_ITEMS_PER_SCAN auf z.B. 200-250 pro Kategorie
     const maxItemsPerCategoryEnv = process.env.MAX_ITEMS_PER_SCAN || process.env.MAX_ITEMS_PER_CATEGORY;
     const maxItemsPerCategory = maxItemsPerCategoryEnv && !isNaN(Number(maxItemsPerCategoryEnv)) 
       ? parseInt(maxItemsPerCategoryEnv, 10) 
-      : 150; // Standard: 150 Items pro Kategorie (für 2 Kategorien = 300 Items total)
+      : 0; // Standard: 0 = kein Limit (scannt alle Items aus beiden Kategorien)
     
     // Timeout-Handling: Railway hat kein festes Timeout, aber wir setzen ein Limit für Stabilität
     // Erhöht auf 30 Min für Railway, damit mehrere Kategorien verarbeitet werden können
