@@ -100,15 +100,19 @@ export async function GET(request: Request) {
       console.log(`[SCAN] Automatisches Item-Limit: ${maxItemsPerCategory} Items pro Kategorie (für ${enabledUrlsCount} Kategorie${enabledUrlsCount > 1 ? 'n' : ''})`);
     }
     
-    // Timeout-Handling: Railway hat ein Timeout von ~10 Minuten für HTTP-Requests
-    // Wir setzen ein Limit von 9 Minuten PRO KATEGORIE, um sicher unter dem Railway-Limit zu bleiben
-    // Jede Kategorie kann bis zu 9 Minuten haben, damit beide vollständig gescannt werden können
-    const MAX_CATEGORY_TIME_MS = 540000; // 9 Minuten (540 Sekunden) pro Kategorie - sicher unter Railway-Limit von 10 Min
+    // Timeout-Handling: Railway hat ein Timeout von 15 Minuten für HTTP-Requests (gesamt, nicht pro Kategorie)
+    // Wir setzen ein Limit von 15 Minuten GESAMT für alle Kategorien zusammen
+    // Bei 2 Kategorien: 15 Min / 2 = 7.5 Min pro Kategorie
+    // Mit 1.1s Delay: 300 Items × 1.5s = 450s = 7.5 Min pro Kategorie → passt genau
+    const MAX_TOTAL_TIME_MS = 900000; // 15 Minuten (900 Sekunden) gesamt - Railway-Limit
+    const MAX_CATEGORY_TIME_MS = MAX_TOTAL_TIME_MS / enabledUrlsCount; // Aufgeteilt auf Kategorien
     const overallStartTime = Date.now(); // Für Gesamt-Statistiken
+
+    console.log(`[SCAN] Timeout-Konfiguration: ${MAX_TOTAL_TIME_MS/1000/60} Min gesamt, ${Math.round(MAX_CATEGORY_TIME_MS/1000/60*10)/10} Min pro Kategorie (für ${enabledUrlsCount} Kategorie${enabledUrlsCount > 1 ? 'n' : ''})`);
 
     // Für jede konfigurierte URL
     for (const urlConfig of enabledUrls) {
-      // Start-Zeit für diese Kategorie
+      // Start-Zeit für diese Kategorie (relativ zum Gesamt-Start)
       const categoryStartTime = Date.now();
       try {
         console.log(`Scraping Vinted: ${urlConfig.name}... (max ${maxPages} Seiten)`);
