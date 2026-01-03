@@ -106,19 +106,6 @@ export default function Home() {
     }
   };
 
-  const handleStopScan = () => {
-    if (abortController) {
-      abortController.abort();
-      setAbortController(null);
-      setIsSearching(false);
-      setScanningCategory(null);
-      setError("Scan wurde gestoppt.");
-    }
-  };
-
-  const handleStartScanAll = () => {
-    handleStartScan();
-  };
 
   return (
     <Layout>
@@ -142,21 +129,6 @@ export default function Home() {
              <Server className="mr-2 h-4 w-4" />
              Scraper Status
            </Button>
-           {isSearching ? (
-             <Button 
-               onClick={handleStopScan} 
-               variant="outline"
-               className="shadow-lg shadow-red-500/20 border-red-500/50 hover:bg-red-500/10"
-             >
-               <Square className="mr-2 h-4 w-4" />
-               Stop Scan
-             </Button>
-           ) : (
-             <Button onClick={handleStartScanAll} className="shadow-lg shadow-blue-500/20">
-               <Search className="mr-2 h-4 w-4" />
-               Start Scan
-             </Button>
-           )}
         </div>
       </div>
 
