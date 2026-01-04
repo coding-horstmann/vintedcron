@@ -176,9 +176,10 @@ export async function GET(request: Request) {
             console.warn(`[SCAN] Warnung: Nur noch ${Math.round(remainingTime/1000)}s übrig. Verarbeite noch ${Math.min(10, itemsToProcess.length - i)} Items...`);
           }
           
-          // Abbrechen wenn Timeout für diese Kategorie erreicht (mit Puffer für Response)
+          // Abbrechen wenn Timeout erreicht (mit Puffer für Response)
           // Verwende einen größeren Puffer (30 Sekunden), damit mehr Items verarbeitet werden können
-          if (elapsedTime > MAX_CATEGORY_TIME_MS - 30000) { // 30 Sekunden Puffer für Response
+          // Prüfe sowohl Kategorie-Limit als auch Gesamt-Limit
+          if (categoryElapsedTime > MAX_CATEGORY_TIME_MS - 30000 || totalElapsedTime > MAX_TOTAL_TIME_MS - 30000) { // 30 Sekunden Puffer für Response
             const remainingItems = itemsToProcess.length - i;
             console.warn(`[SCAN] Timeout nahe (${Math.round(elapsedTime/1000)}s). Breche eBay-API-Calls ab. ${remainingItems} Items werden mit Fallback-URLs hinzugefügt.`);
             
